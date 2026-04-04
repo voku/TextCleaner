@@ -107,6 +107,10 @@ private val tabTitles = listOf("Raw", "Cleaned", "Markdown", "Prompt")
 private val maxHistorySheetHeight = 420.dp
 private val appCardShape = RoundedCornerShape(24.dp)
 private val panelShape = RoundedCornerShape(18.dp)
+private val codePanelBackground = Color(0xFF111827)
+private val codePanelBorder = Color(0xFF374151)
+private val codePanelTitle = Color(0xFFF9FAFB)
+private val codePanelContent = Color(0xFFE5E7EB)
 private const val mainScreenTag = "TextCleanerMainScreen"
 private const val repositoryUrl = "https://github.com/voku/TextCleaner/"
 
@@ -800,7 +804,7 @@ private fun WarningCard(warnings: List<String>) {
         modifier = Modifier.fillMaxWidth(),
         shape = panelShape,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f),
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.72f),
         ),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
     ) {
@@ -1031,7 +1035,7 @@ private fun CodeSheet(
             snippets.forEach { snippet ->
                 Card(
                     shape = panelShape,
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFF111827)),
+                    colors = CardDefaults.cardColors(containerColor = codePanelBackground),
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),
@@ -1045,19 +1049,19 @@ private fun CodeSheet(
                             Text(
                                 text = snippet.title,
                                 style = MaterialTheme.typography.titleSmall,
-                                color = Color(0xFFF9FAFB),
+                                color = codePanelTitle,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             TextButton(onClick = { onCopy(snippet.title, snippet.content) }) {
                                 Text("Copy")
                             }
                         }
-                        HorizontalDivider(color = Color(0xFF374151))
+                        HorizontalDivider(color = codePanelBorder)
                         SelectionContainer {
                             Text(
                                 text = snippet.content,
                                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                color = Color(0xFFE5E7EB),
+                                color = codePanelContent,
                             )
                         }
                     }
