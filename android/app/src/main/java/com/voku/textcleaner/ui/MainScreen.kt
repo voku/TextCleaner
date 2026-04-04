@@ -111,6 +111,9 @@ private val codePanelBackground = Color(0xFF111827)
 private val codePanelBorder = Color(0xFF374151)
 private val codePanelTitle = Color(0xFFF9FAFB)
 private val codePanelContent = Color(0xFFE5E7EB)
+private const val cleaningDelayMs = 200L
+private const val warningCardBackgroundAlpha = 0.72f
+private const val warningCardBorderAlpha = 0.35f
 private const val mainScreenTag = "TextCleanerMainScreen"
 private const val repositoryUrl = "https://github.com/voku/TextCleaner/"
 
@@ -184,7 +187,7 @@ fun MainScreen(
         if (text.isNotBlank() && !isCleaning) {
             scope.launch {
                 isCleaning = true
-                delay(200)
+                delay(cleaningDelayMs)
                 cleanCurrentText(text)
                 isCleaning = false
             }
@@ -804,9 +807,9 @@ private fun WarningCard(warnings: List<String>) {
         modifier = Modifier.fillMaxWidth(),
         shape = panelShape,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.72f),
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = warningCardBackgroundAlpha),
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = warningCardBorderAlpha)),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
