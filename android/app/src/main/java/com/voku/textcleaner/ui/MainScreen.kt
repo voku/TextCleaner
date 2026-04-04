@@ -241,6 +241,9 @@ fun MainScreen(
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
                 ),
                 actions = {
+                    IconButton(onClick = { openRepository(context) }) {
+                        Icon(Icons.Default.OpenInNew, contentDescription = "Contribute on GitHub")
+                    }
                     IconButton(onClick = { showCodeSheet = true }) {
                         Icon(Icons.Default.Code, contentDescription = "View cleanup logic")
                     }
@@ -250,19 +253,35 @@ fun MainScreen(
                 },
             )
         },
+        bottomBar = {
+            if (isProcessText && result != null) {
+                Button(
+                    onClick = {
+                        val data = Intent().apply {
+                            putExtra(Intent.EXTRA_PROCESS_TEXT, result?.cleanedText)
+                        }
+                        (context as? Activity)?.run {
+                            setResult(Activity.RESULT_OK, data)
+                            finish()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                ) {
+                    Text("Return cleaned text")
+                }
+            }
+        },
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            HeroSection(
-                onOpenGitHub = { openRepository(context) },
-            )
-
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 shape = appCardShape,
@@ -395,22 +414,6 @@ fun MainScreen(
                 }
             }
 
-            if (isProcessText && result != null) {
-                Button(
-                    onClick = {
-                        val data = Intent().apply {
-                            putExtra(Intent.EXTRA_PROCESS_TEXT, result?.cleanedText)
-                        }
-                        (context as? Activity)?.run {
-                            setResult(Activity.RESULT_OK, data)
-                            finish()
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Return cleaned text")
-                }
-            }
         }
     }
 
@@ -442,46 +445,6 @@ fun MainScreen(
             onDismiss = { showCodeSheet = false },
             onCopy = { title, content -> copyText(context, title, content) },
         )
-    }
-}
-
-@Composable
-private fun HeroSection(
-    onOpenGitHub: () -> Unit,
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = appCardShape,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-        ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Text(
-                text = "Clean noisy text before sending it to an LLM.",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Text(
-                text = "Strip GitHub chrome, docs sidebars, article boilerplate, and chat clutter while keeping the main content readable.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.secondary,
-            )
-            TextButton(
-                onClick = onOpenGitHub,
-                modifier = Modifier.align(Alignment.End),
-            ) {
-                Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Contribute on GitHub")
-            }
-        }
     }
 }
 
@@ -642,7 +605,7 @@ private fun RawTextPanel(
                 onValueChange = onValueChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 360.dp),
+                    .heightIn(min = 180.dp),
                 label = { Text("Raw text") },
                 placeholder = { Text("Paste noisy text here…") },
                 textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
@@ -702,7 +665,7 @@ private fun ReadOnlyOutput(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 360.dp)
+                    .heightIn(min = 180.dp)
                     .background(
                         color = MaterialTheme.colorScheme.surface,
                         shape = panelShape,
