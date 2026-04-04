@@ -1,6 +1,7 @@
 package com.voku.textcleaner.ui
 
 import android.content.Context
+import android.util.Log
 import com.voku.textcleaner.core.CleanedResult
 import com.voku.textcleaner.core.SourceType
 import org.json.JSONArray
@@ -12,6 +13,11 @@ internal data class SamplePreset(
     val preset: SourceType?,
 )
 
+/**
+ * Persisted cleanup history entry.
+ *
+ * `timestamp` is stored as Unix time in milliseconds.
+ */
 internal data class HistoryItem(
     val id: String,
     val timestamp: Long,
@@ -139,6 +145,7 @@ private data class CodeSnippetSource(
 private const val historyPrefsName = "text_cleaner_history"
 private const val historyPrefsKey = "items"
 private const val maxHistoryItems = 50
+private const val mainScreenSupportTag = "TextCleanerUiSupport"
 
 private val codeSnippetSources = listOf(
     CodeSnippetSource("core/Engine.kt", "cleanup-logic/Engine.kt"),
@@ -169,12 +176,14 @@ internal fun loadHistory(context: Context): List<HistoryItem> {
                 )
             }
         }
+    }.onFailure {
+        Log.w(mainScreenSupportTag, "Unable to parse saved history", it)
     }.getOrDefault(emptyList())
 }
 
 internal fun saveHistory(context: Context, history: List<HistoryItem>) {
     val payload = JSONArray()
-    history.take(maxHistoryItems).forEach { item ->
+    history.forEach { item ->
         payload.put(item.toJson())
     }
     context.getSharedPreferences(historyPrefsName, Context.MODE_PRIVATE)
@@ -210,7 +219,8 @@ internal fun loadCodeSnippets(context: Context): List<LoadedCodeSnippet> =
             content = runCatching {
                 context.assets.open(source.assetPath).bufferedReader().use { it.readText() }
             }.getOrElse {
-                "Unable to load ${source.title}: ${it.message ?: "unknown error"}"
+                Log.w(mainScreenSupportTag, "Unable to load ${source.title}", it)
+                "Unable to load ${source.title}."
             },
         )
     }
@@ -241,8 +251,5 @@ private fun JSONObject.toCleanedResult(): CleanedResult = CleanedResult(
     warnings = getJSONArray("warnings").toStringList(),
 )
 
-private fun JSONArray.toStringList(): List<String> = buildList {
-    for (index in 0 until length()) {
-        add(getString(index))
-    }
-}
+private fun JSONArray.toStringList(): List<String> =
+    (0 until length()).map(::getString)

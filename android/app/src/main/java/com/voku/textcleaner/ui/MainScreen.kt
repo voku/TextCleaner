@@ -5,10 +5,9 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -67,7 +66,7 @@ import java.util.Date
 
 private data class PresetOption(val value: SourceType?, val label: String)
 private data class PendingExport(val text: String, val filename: String)
-private data class TabExport(val text: String, val filename: String, val placeholder: String)
+private data class TabExport(val text: String, val filename: String, val mimeType: String)
 
 private val presetOptions = listOf(
     PresetOption(null, "Auto-detect"),
@@ -89,6 +88,8 @@ private val sourceTypeLabels = mapOf(
 )
 
 private val tabTitles = listOf("Raw", "Cleaned", "Markdown", "Prompt")
+private val maxHistorySheetHeight = 420.dp
+private const val mainScreenTag = "TextCleanerMainScreen"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,11 +108,12 @@ fun MainScreen(
     var pendingExport by remember { mutableStateOf<PendingExport?>(null) }
 
     val createDocumentLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("*/*"),
-    ) { uri ->
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { activityResult ->
         val export = pendingExport
         pendingExport = null
-        if (uri != null && export != null) {
+        val uri = activityResult.data?.data
+        if (activityResult.resultCode == Activity.RESULT_OK && uri != null && export != null) {
             runCatching {
                 context.contentResolver.openOutputStream(uri)?.bufferedWriter().use { writer ->
                     writer?.write(export.text)
@@ -121,6 +123,19 @@ fun MainScreen(
             }.onFailure {
                 Toast.makeText(context, "Unable to save file", Toast.LENGTH_SHORT).show()
             }
+        }
+    }
+
+    val launchSave: (TabExport) -> Unit = { export ->
+        if (export.text.isNotBlank()) {
+            pendingExport = PendingExport(export.text, export.filename)
+            createDocumentLauncher.launch(
+                Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = export.mimeType
+                    putExtra(Intent.EXTRA_TITLE, export.filename)
+                },
+            )
         }
     }
 
@@ -144,14 +159,6 @@ fun MainScreen(
         if (initialText.isNotBlank() && result == null) {
             cleanCurrentText(initialText)
         }
-    }
-
-    val activeExport = remember(rawText, result, selectedTab) {
-        activeExportForTab(
-            selectedTab = selectedTab,
-            rawText = rawText,
-            result = result,
-        )
     }
 
     Scaffold(
@@ -244,7 +251,7 @@ fun MainScreen(
                     onValueChange = { rawText = it },
                     onCopy = { copyText(context, "Raw Text", rawText) },
                     onShare = { shareText(context, rawText) },
-                    onSave = { requestSave(activeExport, createDocumentLauncher, pendingExportSetter = { pendingExport = it }) },
+                    onSave = { launchSave(TabExport(rawText, "raw-text.txt", "text/plain")) },
                 )
 
                 1 -> ReadOnlyOutput(
@@ -252,10 +259,7 @@ fun MainScreen(
                     placeholder = "Cleaned text will appear here…",
                     context = context,
                     filename = "cleaned-text.txt",
-                    onSave = { text, filename ->
-                        pendingExport = PendingExport(text, filename)
-                        createDocumentLauncher.launch(filename)
-                    },
+                    onSave = { text, filename -> launchSave(TabExport(text, filename, "text/plain")) },
                 )
 
                 2 -> ReadOnlyOutput(
@@ -263,21 +267,15 @@ fun MainScreen(
                     placeholder = "Markdown will appear here…",
                     context = context,
                     filename = "formatted-content.md",
-                    onSave = { text, filename ->
-                        pendingExport = PendingExport(text, filename)
-                        createDocumentLauncher.launch(filename)
-                    },
+                    onSave = { text, filename -> launchSave(TabExport(text, filename, "text/markdown")) },
                 )
 
                 3 -> ReadOnlyOutput(
                     text = result?.llmPromptText.orEmpty(),
-                    placeholder = "LLM prompt will appear here…",
+                    placeholder = "LLM Prompt will appear here…",
                     context = context,
                     filename = "llm-prompt.txt",
-                    onSave = { text, filename ->
-                        pendingExport = PendingExport(text, filename)
-                        createDocumentLauncher.launch(filename)
-                    },
+                    onSave = { text, filename -> launchSave(TabExport(text, filename, "text/plain")) },
                 )
             }
 
@@ -285,7 +283,7 @@ fun MainScreen(
             if (currentResult != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Detected: ${labelForSourceType(currentResult.detectedType)} · Removed ${currentResult.removedLineCount} lines",
+                    text = "Detected: ${labelForSourceType(currentResult.detectedType)} - Removed ${currentResult.removedLineCount} lines",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary,
                 )
@@ -449,7 +447,7 @@ private fun HistorySheet(
                 )
             } else {
                 LazyColumn(
-                    modifier = Modifier.heightIn(max = 420.dp),
+                    modifier = Modifier.heightIn(max = maxHistorySheetHeight),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(history, key = { it.id }) { item ->
@@ -616,30 +614,13 @@ private fun shareText(context: Context, text: String) {
 }
 
 private fun labelForSourceType(type: SourceType): String =
-    sourceTypeLabels[type] ?: type.name
+    sourceTypeLabels[type] ?: run {
+        Log.w(mainScreenTag, "Missing source type label for $type")
+        formatSourceTypeFallback(type)
+    }
+
+private fun formatSourceTypeFallback(type: SourceType): String =
+    type.name
         .lowercase()
         .split('_')
         .joinToString(" ") { token -> token.replaceFirstChar(Char::titlecase) }
-
-private fun activeExportForTab(
-    selectedTab: Int,
-    rawText: String,
-    result: CleanedResult?,
-): TabExport = when (selectedTab) {
-    0 -> TabExport(rawText, "raw-text.txt", "Paste noisy text here…")
-    1 -> TabExport(result?.cleanedText.orEmpty(), "cleaned-text.txt", "Cleaned text will appear here…")
-    2 -> TabExport(result?.markdownText.orEmpty(), "formatted-content.md", "Markdown will appear here…")
-    else -> TabExport(result?.llmPromptText.orEmpty(), "llm-prompt.txt", "LLM prompt will appear here…")
-}
-
-private fun requestSave(
-    export: TabExport,
-    launcher: ManagedActivityResultLauncher<String, Uri?>,
-    pendingExportSetter: (PendingExport) -> Unit,
-) {
-    if (export.text.isBlank()) {
-        return
-    }
-    pendingExportSetter(PendingExport(export.text, export.filename))
-    launcher.launch(export.filename)
-}
