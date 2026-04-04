@@ -24,7 +24,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -219,6 +234,14 @@ fun MainScreen(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
                 ),
+                actions = {
+                    IconButton(onClick = { showCodeSheet = true }) {
+                        Icon(Icons.Default.Code, contentDescription = "View cleanup logic")
+                    }
+                    IconButton(onClick = { showHistorySheet = true }) {
+                        Icon(Icons.Default.History, contentDescription = "View local history")
+                    }
+                },
             )
         },
     ) { padding ->
@@ -231,8 +254,6 @@ fun MainScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             HeroSection(
-                onOpenCode = { showCodeSheet = true },
-                onOpenHistory = { showHistorySheet = true },
                 onOpenGitHub = { openRepository(context) },
             )
 
@@ -420,8 +441,6 @@ fun MainScreen(
 
 @Composable
 private fun HeroSection(
-    onOpenCode: () -> Unit,
-    onOpenHistory: () -> Unit,
     onOpenGitHub: () -> Unit,
 ) {
     Card(
@@ -448,46 +467,13 @@ private fun HeroSection(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.secondary,
             )
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val compact = maxWidth < 460.dp
-                if (compact) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = onOpenCode,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("Cleanup logic")
-                        }
-                        OutlinedButton(
-                            onClick = onOpenHistory,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("Local history")
-                        }
-                        TextButton(
-                            onClick = onOpenGitHub,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("Contribute on GitHub")
-                        }
-                    }
-                } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        OutlinedButton(onClick = onOpenCode) {
-                            Text("Cleanup logic")
-                        }
-                        OutlinedButton(onClick = onOpenHistory) {
-                            Text("Local history")
-                        }
-                        Spacer(modifier = Modifier.weight(1f))
-                        TextButton(onClick = onOpenGitHub) {
-                            Text("Contribute on GitHub")
-                        }
-                    }
-                }
+            TextButton(
+                onClick = onOpenGitHub,
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                Icon(Icons.Default.OpenInNew, contentDescription = "Opens in browser", modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Contribute on GitHub")
             }
         }
     }
@@ -526,18 +512,26 @@ private fun ControlsSection(
                                     }
                                 },
                         ) {
+                            if (!isCleaning) {
+                                Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
                             Text(if (isCleaning) "Cleaning…" else "Clean text")
                         }
                         OutlinedButton(
                             onClick = onLoadSample,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
+                            Icon(Icons.Default.Article, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text("Load sample")
                         }
                         OutlinedButton(
                             onClick = onReset,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text("Reset")
                         }
                     }
@@ -853,32 +847,15 @@ private fun InlineActionButtons(
     onSave: () -> Unit,
     saveLabel: String = "Save",
 ) {
-    BoxWithConstraints {
-        val compact = maxWidth < 220.dp
-        if (compact) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onCopy, modifier = Modifier.fillMaxWidth()) {
-                    Text("Copy")
-                }
-                OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth()) {
-                    Text("Share")
-                }
-                OutlinedButton(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
-                    Text(saveLabel)
-                }
-            }
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onCopy) {
-                    Text("Copy")
-                }
-                OutlinedButton(onClick = onShare) {
-                    Text("Share")
-                }
-                OutlinedButton(onClick = onSave) {
-                    Text(saveLabel)
-                }
-            }
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        IconButton(onClick = onCopy) {
+            Icon(Icons.Default.ContentCopy, contentDescription = "Copy")
+        }
+        IconButton(onClick = onShare) {
+            Icon(Icons.Default.Share, contentDescription = "Share")
+        }
+        IconButton(onClick = onSave) {
+            Icon(Icons.Default.Download, contentDescription = saveLabel)
         }
     }
 }
@@ -892,12 +869,18 @@ private fun FullWidthActionButtons(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = onCopy, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text("Copy")
         }
         OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text("Share")
         }
         OutlinedButton(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text("Save $saveLabel")
         }
     }
@@ -986,6 +969,8 @@ private fun HistorySheet(
                                         color = MaterialTheme.colorScheme.secondary,
                                     )
                                     TextButton(onClick = { onDelete(item.id) }) {
+                                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
                                         Text("Delete")
                                     }
                                 }
@@ -1020,6 +1005,8 @@ private fun HistorySheet(
                     onClick = onClear,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
+                    Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text("Clear all history")
                 }
             }
@@ -1070,6 +1057,8 @@ private fun CodeSheet(
                                 fontWeight = FontWeight.SemiBold,
                             )
                             TextButton(onClick = { onCopy(snippet.title, snippet.content) }) {
+                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text("Copy")
                             }
                         }
