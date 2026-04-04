@@ -189,22 +189,17 @@ fun MainScreen(
         }
     }
 
-    val cleanCurrentText: suspend (String) -> Unit = { text ->
-        if (text.isNotBlank()) {
-            val cleaned = withContext(Dispatchers.Default) {
-                Engine.cleanText(RawInput(rawText = text, sourceTypeHint = selectedPreset))
-            }
-            rawText = text
-            result = cleaned
-            selectedTab = 1
-            history = appendHistory(
-                context = context,
-                history = history,
-                rawText = text,
-                preset = selectedPreset,
-                result = cleaned,
-            )
-        }
+    fun applyCleanResult(text: String, cleaned: CleanedResult) {
+        rawText = text
+        result = cleaned
+        selectedTab = 1
+        history = appendHistory(
+            context = context,
+            history = history,
+            rawText = text,
+            preset = selectedPreset,
+            result = cleaned,
+        )
     }
 
     val requestClean: (String) -> Unit = { text ->
@@ -212,7 +207,10 @@ fun MainScreen(
             scope.launch {
                 isCleaning = true
                 delay(CLEANING_DEBOUNCE_MILLIS)
-                cleanCurrentText(text)
+                val cleaned = withContext(Dispatchers.Default) {
+                    Engine.cleanText(RawInput(rawText = text, sourceTypeHint = selectedPreset))
+                }
+                applyCleanResult(text, cleaned)
                 isCleaning = false
             }
         }
@@ -220,7 +218,10 @@ fun MainScreen(
 
     LaunchedEffect(initialText) {
         if (initialText.isNotBlank() && result == null) {
-            cleanCurrentText(initialText)
+            val cleaned = withContext(Dispatchers.Default) {
+                Engine.cleanText(RawInput(rawText = initialText, sourceTypeHint = selectedPreset))
+            }
+            applyCleanResult(initialText, cleaned)
         }
     }
 
@@ -955,8 +956,10 @@ private fun HistorySheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .semantics {
+                                    val lineCount = item.result.removedLineCount
+                                    val lineWord = if (lineCount == 1) "line" else "lines"
                                     contentDescription = "${labelForSourceType(item.result.detectedType)}, $itemDate. " +
-                                        "Removed ${item.result.removedLineCount} lines. Tap to restore."
+                                        "Removed $lineCount $lineWord. Tap to restore."
                                 }
                                 .clickable { onRestore(item) },
                             shape = panelShape,
