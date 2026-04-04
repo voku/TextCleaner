@@ -1,0 +1,5 @@
+{
+  "name": "Text Cleaner",
+  "description": "A web-first prototype for a mobile text-cleaning tool that cleans copied or shared text from noisy mobile web pages.",
+  "requestFramePermissions": []
+}
