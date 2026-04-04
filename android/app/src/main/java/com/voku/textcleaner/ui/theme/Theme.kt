@@ -41,7 +41,7 @@ private val DarkColors = darkColorScheme(
 @Composable
 fun TextCleanerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val colorScheme = when {

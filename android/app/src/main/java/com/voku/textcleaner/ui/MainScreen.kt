@@ -5,12 +5,17 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -19,10 +24,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
@@ -40,9 +46,12 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -51,11 +60,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.voku.textcleaner.core.CleanedResult
 import com.voku.textcleaner.core.Engine
@@ -63,6 +77,8 @@ import com.voku.textcleaner.core.RawInput
 import com.voku.textcleaner.core.SourceType
 import java.text.DateFormat
 import java.util.Date
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private data class PresetOption(val value: SourceType?, val label: String)
 private data class PendingExport(val text: String, val filename: String)
@@ -89,7 +105,10 @@ private val sourceTypeLabels = mapOf(
 
 private val tabTitles = listOf("Raw", "Cleaned", "Markdown", "Prompt")
 private val maxHistorySheetHeight = 420.dp
+private val appCardShape = RoundedCornerShape(24.dp)
+private val panelShape = RoundedCornerShape(18.dp)
 private const val mainScreenTag = "TextCleanerMainScreen"
+private const val repositoryUrl = "https://github.com/voku/TextCleaner/"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -98,6 +117,7 @@ fun MainScreen(
     isProcessText: Boolean = false,
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     var rawText by rememberSaveable { mutableStateOf(initialText) }
     var selectedPreset by rememberSaveable { mutableStateOf<SourceType?>(null) }
     var result by remember { mutableStateOf<CleanedResult?>(null) }
@@ -106,6 +126,7 @@ fun MainScreen(
     var showHistorySheet by rememberSaveable { mutableStateOf(false) }
     var showCodeSheet by rememberSaveable { mutableStateOf(false) }
     var pendingExport by remember { mutableStateOf<PendingExport?>(null) }
+    var isCleaning by rememberSaveable { mutableStateOf(false) }
 
     val createDocumentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult(),
@@ -155,27 +176,37 @@ fun MainScreen(
         }
     }
 
+    val requestClean: (String) -> Unit = { text ->
+        if (text.isNotBlank() && !isCleaning) {
+            scope.launch {
+                isCleaning = true
+                delay(200)
+                cleanCurrentText(text)
+                isCleaning = false
+            }
+        }
+    }
+
     LaunchedEffect(initialText) {
         if (initialText.isNotBlank() && result == null) {
             cleanCurrentText(initialText)
         }
     }
 
+    val activeExport = currentTabExport(
+        selectedTab = selectedTab,
+        rawText = rawText,
+        result = result,
+    )
+
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = { Text("Text Cleaner") },
-                actions = {
-                    TextButton(onClick = { showCodeSheet = true }) {
-                        Text("Code", color = MaterialTheme.colorScheme.onPrimary)
-                    }
-                    TextButton(onClick = { showHistorySheet = true }) {
-                        Text("History", color = MaterialTheme.colorScheme.onPrimary)
-                    }
-                },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground,
                 ),
             )
         },
@@ -184,130 +215,159 @@ fun MainScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
                 .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            PresetDropdown(
-                selected = selectedPreset,
-                onSelected = { selectedPreset = it },
+            HeroSection(
+                onOpenCode = { showCodeSheet = true },
+                onOpenHistory = { showHistorySheet = true },
+                onOpenGitHub = { openRepository(context) },
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Row(
+            Card(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                shape = appCardShape,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
             ) {
+                Column {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(
+                                color = MaterialTheme.colorScheme.surfaceContainerLowest,
+                                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                            )
+                            .padding(16.dp),
+                    ) {
+                        ControlsSection(
+                            selectedPreset = selectedPreset,
+                            onPresetSelected = { selectedPreset = it },
+                            onLoadSample = {
+                                val sample = samplesByPreset[selectedPreset]
+                                    ?: requireNotNull(samplesByPreset[null])
+                                rawText = sample.text
+                                selectedPreset = sample.preset
+                            },
+                            onReset = {
+                                rawText = ""
+                                result = null
+                                selectedTab = 0
+                                selectedPreset = null
+                            },
+                            onClean = { requestClean(rawText) },
+                            canClean = rawText.isNotBlank() && !isCleaning,
+                            isCleaning = isCleaning,
+                        )
+                    }
+
+                    TabRow(
+                        selectedTabIndex = selectedTab,
+                        containerColor = Color.Transparent,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        indicator = { positions ->
+                            TabRowDefaults.SecondaryIndicator(
+                                modifier = Modifier.tabIndicatorOffset(positions[selectedTab]),
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        },
+                        divider = {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        },
+                    ) {
+                        tabTitles.forEachIndexed { index, title ->
+                            Tab(
+                                selected = selectedTab == index,
+                                onClick = { selectedTab = index },
+                                selectedContentColor = MaterialTheme.colorScheme.primary,
+                                unselectedContentColor = MaterialTheme.colorScheme.secondary,
+                                text = {
+                                    Text(
+                                        text = title,
+                                        fontWeight = if (selectedTab == index) FontWeight.SemiBold else FontWeight.Medium,
+                                    )
+                                },
+                            )
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        when (selectedTab) {
+                            0 -> RawTextPanel(
+                                text = rawText,
+                                onValueChange = { rawText = it },
+                                onCopy = { copyText(context, "Raw Text", rawText) },
+                                onShare = { shareText(context, rawText) },
+                                onSave = { launchSave(TabExport(rawText, "raw-text.txt", "text/plain")) },
+                            )
+
+                            1 -> ReadOnlyOutput(
+                                text = result?.cleanedText.orEmpty(),
+                                placeholder = "Cleaned text will appear here…",
+                                context = context,
+                                filename = "cleaned-text.txt",
+                                onSave = { text, filename -> launchSave(TabExport(text, filename, "text/plain")) },
+                            )
+
+                            2 -> ReadOnlyOutput(
+                                text = result?.markdownText.orEmpty(),
+                                placeholder = "Markdown will appear here…",
+                                context = context,
+                                filename = "formatted-content.md",
+                                onSave = { text, filename -> launchSave(TabExport(text, filename, "text/markdown")) },
+                            )
+
+                            3 -> ReadOnlyOutput(
+                                text = result?.llmPromptText.orEmpty(),
+                                placeholder = "LLM prompt will appear here…",
+                                context = context,
+                                filename = "llm-prompt.txt",
+                                onSave = { text, filename -> launchSave(TabExport(text, filename, "text/plain")) },
+                            )
+                        }
+
+                        val currentResult = result
+                        if (currentResult != null && activeExport != null) {
+                            ResultSummaryCard(
+                                result = currentResult,
+                                export = activeExport,
+                                onCopy = { copyText(context, activeExport.filename, activeExport.text) },
+                                onShare = { shareText(context, activeExport.text) },
+                                onSave = { launchSave(activeExport) },
+                                activeTabLabel = tabTitles[selectedTab],
+                            )
+                        }
+
+                        if (currentResult?.warnings.orEmpty().isNotEmpty()) {
+                            WarningCard(warnings = currentResult?.warnings.orEmpty())
+                        }
+                    }
+                }
+            }
+
+            if (isProcessText && result != null) {
                 Button(
-                    onClick = { cleanCurrentText(rawText) },
-                    enabled = rawText.isNotBlank(),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Clean Text")
-                }
-
-                OutlinedButton(
                     onClick = {
-                        val sample = samplesByPreset[selectedPreset]
-                            ?: requireNotNull(samplesByPreset[null])
-                        rawText = sample.text
-                        selectedPreset = sample.preset
+                        val data = Intent().apply {
+                            putExtra(Intent.EXTRA_PROCESS_TEXT, result?.cleanedText)
+                        }
+                        (context as? Activity)?.run {
+                            setResult(Activity.RESULT_OK, data)
+                            finish()
+                        }
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Sample")
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        rawText = ""
-                        result = null
-                        selectedTab = 0
-                        selectedPreset = null
-                    },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("Reset")
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            TabRow(selectedTabIndex = selectedTab) {
-                tabTitles.forEachIndexed { index, title ->
-                    Tab(
-                        selected = selectedTab == index,
-                        onClick = { selectedTab = index },
-                        text = { Text(title) },
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            when (selectedTab) {
-                0 -> RawTextPanel(
-                    text = rawText,
-                    onValueChange = { rawText = it },
-                    onCopy = { copyText(context, "Raw Text", rawText) },
-                    onShare = { shareText(context, rawText) },
-                    onSave = { launchSave(TabExport(rawText, "raw-text.txt", "text/plain")) },
-                )
-
-                1 -> ReadOnlyOutput(
-                    text = result?.cleanedText.orEmpty(),
-                    placeholder = "Cleaned text will appear here…",
-                    context = context,
-                    filename = "cleaned-text.txt",
-                    onSave = { text, filename -> launchSave(TabExport(text, filename, "text/plain")) },
-                )
-
-                2 -> ReadOnlyOutput(
-                    text = result?.markdownText.orEmpty(),
-                    placeholder = "Markdown will appear here…",
-                    context = context,
-                    filename = "formatted-content.md",
-                    onSave = { text, filename -> launchSave(TabExport(text, filename, "text/markdown")) },
-                )
-
-                3 -> ReadOnlyOutput(
-                    text = result?.llmPromptText.orEmpty(),
-                    placeholder = "LLM Prompt will appear here…",
-                    context = context,
-                    filename = "llm-prompt.txt",
-                    onSave = { text, filename -> launchSave(TabExport(text, filename, "text/plain")) },
-                )
-            }
-
-            val currentResult = result
-            if (currentResult != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "Detected: ${labelForSourceType(currentResult.detectedType)} - Removed ${currentResult.removedLineCount} lines",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
-                currentResult.warnings.forEach { warning ->
-                    Text(
-                        text = "⚠ $warning",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
-            }
-
-            if (isProcessText && currentResult != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Button(onClick = {
-                    val data = Intent().apply {
-                        putExtra(Intent.EXTRA_PROCESS_TEXT, currentResult.cleanedText)
-                    }
-                    (context as? Activity)?.run {
-                        setResult(Activity.RESULT_OK, data)
-                        finish()
-                    }
-                }) {
-                    Text("Return Cleaned Text")
+                    Text("Return cleaned text")
                 }
             }
         }
@@ -345,6 +405,174 @@ fun MainScreen(
 }
 
 @Composable
+private fun HeroSection(
+    onOpenCode: () -> Unit,
+    onOpenHistory: () -> Unit,
+    onOpenGitHub: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = appCardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Text(
+                text = "Clean noisy text before sending it to an LLM.",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "Strip GitHub chrome, docs sidebars, article boilerplate, and chat clutter while keeping the main content readable.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+            Text(
+                text = "This Android UI now mirrors the web layout more closely with the same presets, tab flow, history, and cleanup logic viewer.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                val compact = maxWidth < 460.dp
+                if (compact) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = onOpenCode,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Cleanup logic")
+                        }
+                        OutlinedButton(
+                            onClick = onOpenHistory,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Local history")
+                        }
+                        TextButton(
+                            onClick = onOpenGitHub,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Contribute on GitHub")
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        OutlinedButton(onClick = onOpenCode) {
+                            Text("Cleanup logic")
+                        }
+                        OutlinedButton(onClick = onOpenHistory) {
+                            Text("Local history")
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                        TextButton(onClick = onOpenGitHub) {
+                            Text("Contribute on GitHub")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ControlsSection(
+    selectedPreset: SourceType?,
+    onPresetSelected: (SourceType?) -> Unit,
+    onLoadSample: () -> Unit,
+    onReset: () -> Unit,
+    onClean: () -> Unit,
+    canClean: Boolean,
+    isCleaning: Boolean,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(
+            text = "Use the same preset-first workflow as the web app, then switch between raw, cleaned, markdown, and prompt-ready output.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.secondary,
+        )
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val compact = maxWidth < 560.dp
+            if (compact) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PresetDropdown(
+                        selected = selectedPreset,
+                        onSelected = onPresetSelected,
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = onClean,
+                            enabled = canClean,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(if (isCleaning) "Cleaning…" else "Clean text")
+                        }
+                        OutlinedButton(
+                            onClick = onLoadSample,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Load sample")
+                        }
+                        OutlinedButton(
+                            onClick = onReset,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Reset")
+                        }
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(modifier = Modifier.weight(1.2f)) {
+                        PresetDropdown(
+                            selected = selectedPreset,
+                            onSelected = onPresetSelected,
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = onLoadSample,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("Sample")
+                        }
+                        OutlinedButton(
+                            onClick = onReset,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("Reset")
+                        }
+                        Button(
+                            onClick = onClean,
+                            enabled = canClean,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(if (isCleaning) "Cleaning…" else "Clean text")
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun RawTextPanel(
     text: String,
     onValueChange: (String) -> Unit,
@@ -352,18 +580,54 @@ private fun RawTextPanel(
     onShare: () -> Unit,
     onSave: () -> Unit,
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        TextField(
-            value = text,
-            onValueChange = onValueChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(300.dp),
-            placeholder = { Text("Paste noisy text here…") },
-            textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-        )
-        if (text.isNotBlank()) {
-            ExportActions(onCopy = onCopy, onShare = onShare, onSave = onSave)
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = panelShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = "Raw text",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "Paste copied text here and clean it once you're ready.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+                if (text.isNotBlank()) {
+                    InlineActionButtons(
+                        onCopy = onCopy,
+                        onShare = onShare,
+                        onSave = onSave,
+                    )
+                }
+            }
+            TextField(
+                value = text,
+                onValueChange = onValueChange,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 360.dp),
+                placeholder = { Text("Paste noisy text here…") },
+                textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                colors = inputFieldColors(),
+                shape = panelShape,
+            )
         }
     }
 }
@@ -376,47 +640,244 @@ private fun ReadOnlyOutput(
     filename: String,
     onSave: (String, String) -> Unit,
 ) {
-    if (text.isBlank()) {
-        Text(
-            text = placeholder,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.secondary,
-            modifier = Modifier.padding(vertical = 8.dp),
-        )
-    } else {
-        SelectionContainer {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = panelShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = filename,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "Copy, share, or save the active output.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+                if (text.isNotBlank()) {
+                    InlineActionButtons(
+                        onCopy = { copyText(context, filename, text) },
+                        onShare = { shareText(context, text) },
+                        onSave = { onSave(text, filename) },
+                    )
+                }
+            }
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-            )
+                    .heightIn(min = 360.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surface,
+                        shape = panelShape,
+                    )
+                    .padding(16.dp),
+            ) {
+                if (text.isBlank()) {
+                    Text(
+                        text = placeholder,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                } else {
+                    SelectionContainer {
+                        Text(
+                            text = text,
+                            style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                }
+            }
         }
+    }
+}
 
-        ExportActions(
-            onCopy = { copyText(context, filename, text) },
-            onShare = { shareText(context, text) },
-            onSave = { onSave(text, filename) },
+@Composable
+private fun ResultSummaryCard(
+    result: CleanedResult,
+    export: TabExport,
+    onCopy: () -> Unit,
+    onShare: () -> Unit,
+    onSave: () -> Unit,
+    activeTabLabel: String,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = panelShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+        ) {
+            val compact = maxWidth < 560.dp
+            if (compact) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    ResultSummaryText(result = result)
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Export $activeTabLabel",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        FullWidthActionButtons(
+                            onCopy = onCopy,
+                            onShare = onShare,
+                            onSave = onSave,
+                            saveLabel = export.filename.substringAfterLast('.').uppercase(),
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        ResultSummaryText(result = result)
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = "Export $activeTabLabel",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        InlineActionButtons(
+                            onCopy = onCopy,
+                            onShare = onShare,
+                            onSave = onSave,
+                            saveLabel = "Save ${export.filename.substringAfterLast('.')}",
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResultSummaryText(result: CleanedResult) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Detected type: ${labelForSourceType(result.detectedType)}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Text(
+            text = "Removed lines: ${result.removedLineCount}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
         )
     }
 }
 
 @Composable
-private fun ExportActions(
+private fun WarningCard(warnings: List<String>) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = panelShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.45f),
+        ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.35f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "Warnings",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.error,
+            )
+            warnings.forEach { warning ->
+                Text(
+                    text = "• $warning",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun InlineActionButtons(
     onCopy: () -> Unit,
     onShare: () -> Unit,
     onSave: () -> Unit,
+    saveLabel: String = "Save",
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = onCopy) {
+    BoxWithConstraints {
+        val compact = maxWidth < 220.dp
+        if (compact) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onCopy, modifier = Modifier.fillMaxWidth()) {
+                    Text("Copy")
+                }
+                OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth()) {
+                    Text("Share")
+                }
+                OutlinedButton(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
+                    Text(saveLabel)
+                }
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onCopy) {
+                    Text("Copy")
+                }
+                OutlinedButton(onClick = onShare) {
+                    Text("Share")
+                }
+                OutlinedButton(onClick = onSave) {
+                    Text(saveLabel)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FullWidthActionButtons(
+    onCopy: () -> Unit,
+    onShare: () -> Unit,
+    onSave: () -> Unit,
+    saveLabel: String,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = onCopy, modifier = Modifier.fillMaxWidth()) {
             Text("Copy")
         }
-        OutlinedButton(onClick = onShare) {
+        OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth()) {
             Text("Share")
         }
-        OutlinedButton(onClick = onSave) {
-            Text("Save")
+        OutlinedButton(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
+            Text("Save $saveLabel")
         }
     }
 }
@@ -437,14 +898,39 @@ private fun HistorySheet(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Local History", style = MaterialTheme.typography.titleLarge)
+            Text("Local History", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = "Restore recent cleanups or remove entries you no longer need.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.secondary,
+            )
             if (history.isEmpty()) {
-                Text(
-                    text = "No history yet. Cleaned texts will appear here.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(bottom = 24.dp),
-                )
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 24.dp),
+                    shape = panelShape,
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+                    ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = "No history yet.",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            text = "Cleaned texts will appear here after you run the cleaner.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.secondary,
+                        )
+                    }
+                }
             } else {
                 LazyColumn(
                     modifier = Modifier.heightIn(max = maxHistorySheetHeight),
@@ -455,17 +941,20 @@ private fun HistorySheet(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onRestore(item) },
+                            shape = panelShape,
                             colors = CardDefaults.cardColors(
                                 containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
                             ),
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                         ) {
                             Column(
-                                modifier = Modifier.padding(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Text(
                                         text = DateFormat.getDateTimeInstance(
@@ -481,12 +970,26 @@ private fun HistorySheet(
                                 }
                                 Text(
                                     text = labelForSourceType(item.result.detectedType),
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Text(
+                                    text = "Removed ${item.result.removedLineCount} lines",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.secondary,
                                 )
                                 Text(
                                     text = item.rawText,
                                     style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                                     maxLines = 3,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(
+                                            color = MaterialTheme.colorScheme.surface,
+                                            shape = RoundedCornerShape(12.dp),
+                                        )
+                                        .padding(10.dp),
                                 )
                             }
                         }
@@ -496,7 +999,7 @@ private fun HistorySheet(
                     onClick = onClear,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Clear All History")
+                    Text("Clear all history")
                 }
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -519,36 +1022,42 @@ private fun CodeSheet(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Cleanup Logic", style = MaterialTheme.typography.titleLarge)
+            Text("Cleanup Logic", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
             Text(
-                text = "These snippets mirror the cleanup logic shipped in the native app.",
+                text = "These snippets mirror the native cleanup logic surfaced by the web app code viewer.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.secondary,
             )
             snippets.forEach { snippet ->
                 Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                    ),
+                    shape = panelShape,
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF111827)),
                 ) {
                     Column(
-                        modifier = Modifier.padding(12.dp),
+                        modifier = Modifier.padding(14.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(snippet.title, style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                text = snippet.title,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = Color(0xFFF9FAFB),
+                                fontWeight = FontWeight.SemiBold,
+                            )
                             TextButton(onClick = { onCopy(snippet.title, snippet.content) }) {
                                 Text("Copy")
                             }
                         }
-                        HorizontalDivider()
+                        HorizontalDivider(color = Color(0xFF374151))
                         SelectionContainer {
                             Text(
                                 text = snippet.content,
                                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                                color = Color(0xFFE5E7EB),
                             )
                         }
                     }
@@ -581,6 +1090,8 @@ private fun PresetDropdown(
             modifier = Modifier
                 .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                 .fillMaxWidth(),
+            colors = inputFieldColors(),
+            shape = panelShape,
         )
         ExposedDropdownMenu(
             expanded = expanded,
@@ -596,6 +1107,40 @@ private fun PresetDropdown(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun inputFieldColors() = TextFieldDefaults.colors(
+    focusedContainerColor = MaterialTheme.colorScheme.surface,
+    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+    disabledContainerColor = MaterialTheme.colorScheme.surface,
+    errorContainerColor = MaterialTheme.colorScheme.surface,
+    focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+    unfocusedIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
+    disabledIndicatorColor = MaterialTheme.colorScheme.outlineVariant,
+)
+
+private fun currentTabExport(
+    selectedTab: Int,
+    rawText: String,
+    result: CleanedResult?,
+): TabExport? = when (selectedTab) {
+    0 -> TabExport(rawText, "raw-text.txt", "text/plain")
+    1 -> result?.let { TabExport(it.cleanedText, "cleaned-text.txt", "text/plain") }
+    2 -> result?.let { TabExport(it.markdownText, "formatted-content.md", "text/markdown") }
+    3 -> result?.let { TabExport(it.llmPromptText, "llm-prompt.txt", "text/plain") }
+    else -> null
+}
+
+private fun openRepository(context: Context) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(repositoryUrl)).apply {
+        if (context !is Activity) {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }
+    runCatching { context.startActivity(intent) }.onFailure {
+        Toast.makeText(context, "Unable to open repository", Toast.LENGTH_SHORT).show()
     }
 }
 
