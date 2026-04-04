@@ -102,12 +102,41 @@ Return:
 Be concise and focus on implementation-critical files, not boilerplate.
 ```
 
+## Android
+
+A native Android app lives in the `android/` directory.
+
+**Download the latest APK:**
+Go to [Releases → Android – latest build](../../releases/tag/android-latest) and download `TextCleaner.apk`.
+Enable *Install unknown apps* on your device before opening the file.
+
+### Local Android build
+
+Requires JDK 17 and the Android SDK (API 35).
+
+```bash
+cd android
+./gradlew assembleDebug
+# APK: app/build/outputs/apk/debug/app-debug.apk
+```
+
+### Android CI
+
+The repository includes a `build-android.yml` workflow that:
+
+1. builds the debug APK with Gradle,
+2. attaches it to the rolling pre-release tag `android-latest`, and
+3. uploads it as a workflow artifact (retained for 30 days).
+
+The release is updated automatically on every push to `main`.
+
 ## Architecture
 
 - React + TypeScript frontend
 - Vite build pipeline
 - Pure rule-based cleanup engine in `src/core/`
 - Static hosting via GitHub Pages
+- Android native app in `android/` (Kotlin + Jetpack Compose)
 
 ## Roadmap
 
@@ -116,14 +145,12 @@ Be concise and focus on implementation-critical files, not boilerplate.
 - Polish the web app
 - Improve cleanup quality for real copied content
 - Ship and maintain the GitHub Pages deployment
+- Android native app
 
 ### Later
 
-- Android native implementation
-- Kotlin rewrite / port of the cleanup engine
-- Native share-target flow for mobile
-
-Android work is intentionally deferred until the current web experience is production-ready.
+- Kotlin rewrite / port of the full cleanup engine
+- Native share-target flow for Android
 
 ## Contributing
 
