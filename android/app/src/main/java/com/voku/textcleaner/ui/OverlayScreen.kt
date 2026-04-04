@@ -174,8 +174,7 @@ fun OverlayScreen(
                 if (currentResult != null) {
                     // One-line summary
                     Text(
-                        text = "${overlaySourceTypeLabel(currentResult.detectedType)}" +
-                            " · ${currentResult.removedLineCount} lines removed",
+                        text = "${overlaySourceTypeLabel(currentResult.detectedType)} · ${currentResult.removedLineCount} lines removed",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.secondary,
                     )
