@@ -113,11 +113,11 @@ private val tabTitles = listOf("Raw", "Cleaned", "Markdown", "Prompt")
 private val maxHistorySheetHeight = 420.dp
 private val appCardShape = RoundedCornerShape(24.dp)
 private val panelShape = RoundedCornerShape(18.dp)
-private const val cleaningDebounceMs = 200L
-private const val warningCardBackgroundAlpha = 0.72f
-private const val warningCardBorderAlpha = 0.35f
-private const val mainScreenTag = "TextCleanerMainScreen"
-private const val repositoryUrl = "https://github.com/voku/TextCleaner/"
+private const val CLEANING_DEBOUNCE_MS = 200L
+private const val WARNING_CARD_BACKGROUND_ALPHA = 0.72f
+private const val WARNING_CARD_BORDER_ALPHA = 0.35f
+private const val MAIN_SCREEN_TAG = "TextCleanerMainScreen"
+private const val REPOSITORY_URL = "https://github.com/voku/TextCleaner/"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -189,7 +189,7 @@ fun MainScreen(
         if (text.isNotBlank() && !isCleaning) {
             scope.launch {
                 isCleaning = true
-                delay(cleaningDebounceMs)
+                delay(CLEANING_DEBOUNCE_MS)
                 cleanCurrentText(text)
                 isCleaning = false
             }
@@ -825,9 +825,9 @@ private fun WarningCard(warnings: List<String>) {
         modifier = Modifier.fillMaxWidth(),
         shape = panelShape,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = warningCardBackgroundAlpha),
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = WARNING_CARD_BACKGROUND_ALPHA),
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = warningCardBorderAlpha)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = WARNING_CARD_BORDER_ALPHA)),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -1159,7 +1159,7 @@ private fun currentTabExport(
 }
 
 private fun openRepository(context: Context) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(repositoryUrl)).apply {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(REPOSITORY_URL)).apply {
         if (context !is Activity) {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -1185,7 +1185,7 @@ private fun shareText(context: Context, text: String) {
 
 private fun labelForSourceType(type: SourceType): String =
     sourceTypeLabels[type] ?: run {
-        Log.w(mainScreenTag, "Missing source type label for $type")
+        Log.w(MAIN_SCREEN_TAG, "Missing source type label for $type")
         formatSourceTypeFallback(type)
     }
 

@@ -31,6 +31,7 @@ android {
 
         create("ci") {
             initWith(getByName("release"))
+            // CI publishes a release-like APK that remains installable without managing a private signing key.
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += listOf("release")
         }
