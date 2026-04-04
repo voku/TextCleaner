@@ -196,14 +196,15 @@ fun MainScreen(
             }
 
             // ── Status Bar ──────────────────────────────────────────
-            if (result != null) {
+            val currentResult = result
+            if (currentResult != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Detected: ${sourceTypeLabels[result!!.detectedType] ?: "Unknown"} · Removed ${result!!.removedLineCount} lines",
+                    text = "Detected: ${sourceTypeLabels[currentResult.detectedType] ?: "Unknown"} · Removed ${currentResult.removedLineCount} lines",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary,
                 )
-                for (warning in result!!.warnings) {
+                for (warning in currentResult.warnings) {
                     Text(
                         text = "⚠ $warning",
                         style = MaterialTheme.typography.bodySmall,
@@ -213,11 +214,12 @@ fun MainScreen(
             }
 
             // If launched via PROCESS_TEXT, offer to return the result
-            if (isProcessText && result != null) {
+            val processResult = result
+            if (isProcessText && processResult != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Button(onClick = {
                     val data = Intent().apply {
-                        putExtra(Intent.EXTRA_PROCESS_TEXT, result!!.cleanedText)
+                        putExtra(Intent.EXTRA_PROCESS_TEXT, processResult.cleanedText)
                     }
                     (context as? android.app.Activity)?.run {
                         setResult(android.app.Activity.RESULT_OK, data)

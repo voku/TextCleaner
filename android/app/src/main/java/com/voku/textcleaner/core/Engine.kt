@@ -248,7 +248,7 @@ object Engine {
         var currentLines: List<String>
 
         // If the ruleSet is GenericRuleSet, we already did the work!
-        if (ruleSet === GenericRuleSet && ruleSetOverride == null && input.sourceTypeHint == null) {
+        if (ruleSet == GenericRuleSet && ruleSetOverride == null && input.sourceTypeHint == null) {
             currentLines = preliminaryCleanedLines
         } else {
             currentLines = trimPrefix(originalLines, ruleSet)
