@@ -2,4 +2,5 @@
 <resources>
     <string name="app_name">Text Cleaner</string>
     <string name="repository_url">https://github.com/voku/TextCleaner/</string>
+    <string name="tile_label">Clean clipboard</string>
 </resources>

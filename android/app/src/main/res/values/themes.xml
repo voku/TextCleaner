@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.TextCleaner" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!--
+        Translucent theme for OverlayActivity.
+        windowIsTranslucent lets the previous app show through the window.
+        backgroundDimEnabled is false because Compose draws its own scrim.
+        windowAnimationStyle is null for an instant, snappy appearance.
+    -->
+    <style name="Theme.TextCleaner.Overlay" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>
