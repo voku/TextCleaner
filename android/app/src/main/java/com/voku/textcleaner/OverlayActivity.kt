@@ -65,13 +65,10 @@ class OverlayActivity : ComponentActivity() {
                 val text = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT)?.toString() ?: ""
                 text to true
             }
-            Intent.ACTION_SEND -> {
-                val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: ""
-                text to false
-            }
-            ACTION_CLEAN_CLIPBOARD -> {
-                // Text is passed explicitly from CleanerTileService to avoid clipboard-access
-                // timing issues on Android 10+.
+            // Both ACTION_SEND and ACTION_CLEAN_CLIPBOARD carry their text in EXTRA_TEXT.
+            // For ACTION_CLEAN_CLIPBOARD the text is passed explicitly from CleanerTileService
+            // to avoid clipboard-access timing issues on Android 10+.
+            Intent.ACTION_SEND, ACTION_CLEAN_CLIPBOARD -> {
                 val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: ""
                 text to false
             }

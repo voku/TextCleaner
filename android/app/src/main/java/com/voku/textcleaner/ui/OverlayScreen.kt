@@ -263,7 +263,7 @@ private fun overlaySourceTypeLabel(type: SourceType): String = when (type) {
 }
 
 private fun overlayCopyText(context: Context, text: String) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    val clipboard = context.getSystemService(ClipboardManager::class.java)
     clipboard.setPrimaryClip(ClipData.newPlainText("Cleaned text", text))
     Toast.makeText(context, "Copied!", Toast.LENGTH_SHORT).show()
 }

@@ -2,7 +2,6 @@ package com.voku.textcleaner
 
 import android.app.PendingIntent
 import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.service.quicksettings.Tile
@@ -28,7 +27,7 @@ class CleanerTileService : TileService() {
     override fun onClick() {
         super.onClick()
 
-        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clipboard = getSystemService(ClipboardManager::class.java)
         val text = clipboard.primaryClip?.getItemAt(0)?.text?.toString()
 
         if (text.isNullOrBlank()) {

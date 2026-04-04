@@ -143,7 +143,6 @@ private const val MAIN_SCREEN_TAG = "TextCleanerMainScreen"
 @Composable
 fun MainScreen(
     initialText: String = "",
-    isProcessText: Boolean = false,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -252,26 +251,6 @@ fun MainScreen(
                     }
                 },
             )
-        },
-        bottomBar = {
-            if (isProcessText && result != null) {
-                Button(
-                    onClick = {
-                        val data = Intent().apply {
-                            putExtra(Intent.EXTRA_PROCESS_TEXT, result?.cleanedText)
-                        }
-                        (context as? Activity)?.run {
-                            setResult(Activity.RESULT_OK, data)
-                            finish()
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                ) {
-                    Text("Return cleaned text")
-                }
-            }
         },
     ) { padding ->
         Column(

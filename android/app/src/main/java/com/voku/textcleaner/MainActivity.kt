@@ -30,7 +30,6 @@ class MainActivity : ComponentActivity() {
             TextCleanerTheme {
                 MainScreen(
                     initialText = initialText,
-                    isProcessText = false,
                 )
             }
         }
