@@ -242,7 +242,7 @@ fun MainScreen(
                 ),
                 actions = {
                     IconButton(onClick = { openRepository(context) }) {
-                        Icon(Icons.Default.OpenInNew, contentDescription = "Contribute on GitHub")
+                        Icon(Icons.Default.OpenInNew, contentDescription = "View on GitHub")
                     }
                     IconButton(onClick = { showCodeSheet = true }) {
                         Icon(Icons.Default.Code, contentDescription = "View cleanup logic")
