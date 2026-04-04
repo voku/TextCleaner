@@ -82,6 +82,10 @@ import com.voku.textcleaner.ui.theme.CodePanelBackground
 import com.voku.textcleaner.ui.theme.CodePanelBorder
 import com.voku.textcleaner.ui.theme.CodePanelContent
 import com.voku.textcleaner.ui.theme.CodePanelTitle
+import com.voku.textcleaner.ui.theme.WarningBackground
+import com.voku.textcleaner.ui.theme.WarningBorder
+import com.voku.textcleaner.ui.theme.WarningText
+import com.voku.textcleaner.ui.theme.WarningTitle
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.delay
@@ -115,8 +119,6 @@ private val maxHistorySheetHeight = 420.dp
 private val appCardShape = RoundedCornerShape(24.dp)
 private val panelShape = RoundedCornerShape(18.dp)
 private const val CLEANING_DEBOUNCE_MILLIS = 200L
-private const val WARNING_CARD_BACKGROUND_ALPHA = 0.72f
-private const val WARNING_CARD_BORDER_ALPHA = 0.35f
 private const val MAIN_SCREEN_TAG = "TextCleanerMainScreen"
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -320,6 +322,7 @@ fun MainScreen(
                             )
 
                             1 -> ReadOnlyOutput(
+                                title = "Cleaned text",
                                 text = result?.cleanedText.orEmpty(),
                                 placeholder = "Cleaned text will appear here…",
                                 context = context,
@@ -328,6 +331,7 @@ fun MainScreen(
                             )
 
                             2 -> ReadOnlyOutput(
+                                title = "Markdown",
                                 text = result?.markdownText.orEmpty(),
                                 placeholder = "Markdown will appear here…",
                                 context = context,
@@ -336,6 +340,7 @@ fun MainScreen(
                             )
 
                             3 -> ReadOnlyOutput(
+                                title = "LLM Prompt",
                                 text = result?.llmPromptText.orEmpty(),
                                 placeholder = "LLM prompt will appear here…",
                                 context = context,
@@ -443,11 +448,6 @@ private fun HeroSection(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.secondary,
             )
-            Text(
-                text = "This Android UI now mirrors the web layout more closely with the same presets, tab flow, history, and cleanup logic viewer.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary,
-            )
             BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
                 val compact = maxWidth < 460.dp
                 if (compact) {
@@ -504,11 +504,6 @@ private fun ControlsSection(
     isCleaning: Boolean,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(
-            text = "Use the same preset-first workflow as the web app, then switch between raw, cleaned, markdown, and prompt-ready output.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.secondary,
-        )
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val compact = maxWidth < 560.dp
             if (compact) {
@@ -659,6 +654,7 @@ private fun RawTextPanel(
 
 @Composable
 private fun ReadOnlyOutput(
+    title: String,
     text: String,
     placeholder: String,
     context: Context,
@@ -684,7 +680,7 @@ private fun ReadOnlyOutput(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = filename,
+                        text = title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -825,9 +821,9 @@ private fun WarningCard(warnings: List<String>) {
         modifier = Modifier.fillMaxWidth(),
         shape = panelShape,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = WARNING_CARD_BACKGROUND_ALPHA),
+            containerColor = WarningBackground,
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = WARNING_CARD_BORDER_ALPHA)),
+        border = BorderStroke(1.dp, WarningBorder),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -837,13 +833,13 @@ private fun WarningCard(warnings: List<String>) {
                 text = "Warnings",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.error,
+                color = WarningTitle,
             )
             warnings.forEach { warning ->
                 Text(
                     text = "• $warning",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = WarningText,
                 )
             }
         }
