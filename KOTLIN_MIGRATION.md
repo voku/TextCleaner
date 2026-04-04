@@ -2,6 +2,8 @@
 
 This document outlines how to port the web-based text cleaner to a native Android Kotlin application.
 
+The Android native rewrite is a future milestone. The current priority is to finish and ship the production-ready web app first.
+
 ## Intended Android Native Flow (PROCESS_TEXT)
 1. User selects text in Chrome or another app.
 2. The native Android app appears in the text selection context menu via the \`PROCESS_TEXT\` intent filter.

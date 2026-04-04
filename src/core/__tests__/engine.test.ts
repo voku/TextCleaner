@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { cleanText, normalizeText, trimPrefix, trimSuffix, cleanMiddle, collapseBlankLines } from '../engine';
+import { cleanText, normalizeText, trimPrefix, trimSuffix, cleanMiddle, collapseBlankLines, generateMarkdown } from '../engine';
+import { detectSourceType } from '../detector';
 import { GenericRuleSet } from '../rules/generic';
 import { GitHubRuleSet } from '../rules/github';
 
@@ -64,6 +65,55 @@ describe('Blank Line Collapsing', () => {
     const lines = ['', '', 'Line 1', '', 'Line 2', '', ''];
     const result = collapseBlankLines(lines);
     expect(result).toEqual(['Line 1', '', 'Line 2']);
+  });
+});
+
+describe('Source Detection', () => {
+  it('detects documentation content', () => {
+    const detected = detectSourceType(`# API Reference
+
+This documentation explains the deployment flow in detail.
+
+- install dependencies
+- build the project
+- deploy the static site`);
+
+    expect(detected).toBe('docs');
+  });
+
+  it('detects article content', () => {
+    const detected = detectSourceType(`# Why clean copied text before prompting
+
+Clean input reduces irrelevant context and makes summaries more reliable across long-form article content that has already been stripped of chrome.
+
+This article explains how curated excerpts help with better downstream reviews and summaries.`);
+
+    expect(detected).toBe('article');
+  });
+
+  it('detects chat transcripts', () => {
+    const detected = detectSourceType(`John Doe 10:42 AM
+Can you review the cleaned output?
+Jane Smith 10:43 AM
+Yes — send it over.
+Alex Roe 10:44 AM
+I will post the link in the channel.`);
+
+    expect(detected).toBe('chat');
+  });
+});
+
+describe('Markdown Output', () => {
+  it('creates a markdown heading for cleaned content', () => {
+    const markdown = generateMarkdown('First line\nSecond line', 'article');
+
+    expect(markdown).toBe('# Cleaned Article Excerpt\n\nFirst line\nSecond line');
+  });
+
+  it('formats chat lines as markdown bullets', () => {
+    const markdown = generateMarkdown('John Doe 10:42 AM\nPlease review this.\n\nJane Smith 10:43 AM', 'chat');
+
+    expect(markdown).toBe('# Cleaned Chat Excerpt\n\n- John Doe 10:42 AM\n- Please review this.\n\n- Jane Smith 10:43 AM');
   });
 });
 
@@ -151,6 +201,65 @@ Privacy
     expect(result.cleanedText).toBe('# Fix the bug\nThis PR fixes the bug.\nFiles changed\n1\nCommits\n2\nReview\nrequested changes');
   });
 
+  it('cleans documentation-specific chrome', () => {
+    const result = cleanText({
+      rawText: `
+Documentation
+Table of contents
+On this page
+# Deploying TextCleaner
+Run npm run build before publishing.
+
+## Build output
+The generated files are written to dist.
+
+Edit this page
+Back to top
+Was this page helpful?
+      `,
+      sourceTypeHint: 'docs',
+    });
+
+    expect(result.cleanedText).toBe('# Deploying TextCleaner\nRun npm run build before publishing.\n\n## Build output\nThe generated files are written to dist.');
+  });
+
+  it('cleans article-specific chrome', () => {
+    const result = cleanText({
+      rawText: `
+Latest
+8 min read
+# Why clean copied text before prompting
+Clean input reduces irrelevant context.
+
+Related articles
+Sign up for our newsletter
+Continue reading
+      `,
+      sourceTypeHint: 'article',
+    });
+
+    expect(result.cleanedText).toBe('# Why clean copied text before prompting\nClean input reduces irrelevant context.');
+  });
+
+  it('cleans chat-specific chrome', () => {
+    const result = cleanText({
+      rawText: `
+Messages
+Jump to present
+Today
+John Doe 10:42 AM
+Can you review the cleaned output?
+Jane Smith 10:43 AM
+Yes — send it over.
+Reply in thread
+Typing…
+      `,
+      sourceTypeHint: 'chat',
+    });
+
+    expect(result.cleanedText).toBe('John Doe 10:42 AM\nCan you review the cleaned output?\nJane Smith 10:43 AM\nYes — send it over.');
+  });
+
   it('cleans a real GitHub PR sample', () => {
     const input = {
       rawText: `
@@ -222,10 +331,10 @@ commented
 1 hour ago
 🤖 Hi @voku, I've received your request, and I'm working on it now! You can track my progress in the logs for more details.
 
-gemini-code-assist[bot]
-gemini-code-assist bot reviewed 1 hour ago
+review-assist[bot]
+review-assist bot reviewed 1 hour ago
 Contributor
-gemini-code-assist bot
+review-assist bot
 left a comment
 Code Review
 This pull request implements runtime diagnosability enhancements (RD-P1-3) by surfacing MediaPipe task, backend, and error context. Key changes include the addition of a getRuntimeDiagnostics method in GestureDetector to track delegate states (GPU vs. CPU) and module readiness, which is now exposed through the system status. The PR also includes updated troubleshooting documentation and an incident drill report. Feedback suggests defining a shared interface for the complex diagnostic return type to reduce code duplication and improve maintainability.
@@ -253,8 +362,8 @@ Comment on lines +532 to +551
     lastInitializationError: string | null;
   } {
 Contributor
-@gemini-code-assist
-gemini-code-assist bot
+@review-assist
+review-assist bot
 1 hour ago
 medium
 
@@ -352,38 +461,38 @@ failing checks
 CI / build (pull_request)
 CI / build (pull_request)Failing after 1m
 skipped checks
-🔀 Gemini Dispatch / debugger (pull_request_review)
-🔀 Gemini Dispatch / debugger (pull_request_review)Skipped 1 hour ago
-🔀 Gemini Dispatch / debugger (pull_request)
-🔀 Gemini Dispatch / debugger (pull_request)Skipped 1 hour ago
-🔀 Gemini Dispatch / dispatch (pull_request_review)
-🔀 Gemini Dispatch / dispatch (pull_request_review)Skipped 1 hour ago
-🔀 Gemini Dispatch / fallthrough (pull_request_review)
-🔀 Gemini Dispatch / fallthrough (pull_request_review)Skipped 1 hour ago
-🔀 Gemini Dispatch / fallthrough (pull_request)
-🔀 Gemini Dispatch / fallthrough (pull_request)Skipped 1 hour ago
-🔀 Gemini Dispatch / invoke (pull_request_review)
-🔀 Gemini Dispatch / invoke (pull_request_review)Skipped 1 hour ago
-🔀 Gemini Dispatch / invoke (pull_request)
-🔀 Gemini Dispatch / invoke (pull_request)Skipped 1 hour ago
-🔀 Gemini Dispatch / plan-execute (pull_request_review)
-🔀 Gemini Dispatch / plan-execute (pull_request_review)Skipped 1 hour ago
-🔀 Gemini Dispatch / plan-execute (pull_request)
-🔀 Gemini Dispatch / plan-execute (pull_request)Skipped 1 hour ago
-🔀 Gemini Dispatch / review (pull_request_review)
-🔀 Gemini Dispatch / review (pull_request_review)Skipped 1 hour ago
-🔀 Gemini Dispatch / triage (pull_request_review)
-🔀 Gemini Dispatch / triage (pull_request_review)Skipped 1 hour ago
-🔀 Gemini Dispatch / triage (pull_request)
-🔀 Gemini Dispatch / triage (pull_request)Skipped 1 hour ago
+🔀 Automation Dispatch / debugger (pull_request_review)
+🔀 Automation Dispatch / debugger (pull_request_review)Skipped 1 hour ago
+🔀 Automation Dispatch / debugger (pull_request)
+🔀 Automation Dispatch / debugger (pull_request)Skipped 1 hour ago
+🔀 Automation Dispatch / dispatch (pull_request_review)
+🔀 Automation Dispatch / dispatch (pull_request_review)Skipped 1 hour ago
+🔀 Automation Dispatch / fallthrough (pull_request_review)
+🔀 Automation Dispatch / fallthrough (pull_request_review)Skipped 1 hour ago
+🔀 Automation Dispatch / fallthrough (pull_request)
+🔀 Automation Dispatch / fallthrough (pull_request)Skipped 1 hour ago
+🔀 Automation Dispatch / invoke (pull_request_review)
+🔀 Automation Dispatch / invoke (pull_request_review)Skipped 1 hour ago
+🔀 Automation Dispatch / invoke (pull_request)
+🔀 Automation Dispatch / invoke (pull_request)Skipped 1 hour ago
+🔀 Automation Dispatch / plan-execute (pull_request_review)
+🔀 Automation Dispatch / plan-execute (pull_request_review)Skipped 1 hour ago
+🔀 Automation Dispatch / plan-execute (pull_request)
+🔀 Automation Dispatch / plan-execute (pull_request)Skipped 1 hour ago
+🔀 Automation Dispatch / review (pull_request_review)
+🔀 Automation Dispatch / review (pull_request_review)Skipped 1 hour ago
+🔀 Automation Dispatch / triage (pull_request_review)
+🔀 Automation Dispatch / triage (pull_request_review)Skipped 1 hour ago
+🔀 Automation Dispatch / triage (pull_request)
+🔀 Automation Dispatch / triage (pull_request)Skipped 1 hour ago
 neutral checks
 Mend Security Check
 Mend Security Check — Security Report
 successful checks
-🔀 Gemini Dispatch / dispatch (pull_request)
-🔀 Gemini Dispatch / dispatch (pull_request)Successful in 5s
-🔀 Gemini Dispatch / review / review (pull_request)
-🔀 Gemini Dispatch / review / review (pull_request)Successful in 7s
+🔀 Automation Dispatch / dispatch (pull_request)
+🔀 Automation Dispatch / dispatch (pull_request)Successful in 5s
+🔀 Automation Dispatch / review / review (pull_request)
+🔀 Automation Dispatch / review / review (pull_request)Successful in 7s
 CI / integration-heavy-training (pull_request)
 CI / integration-heavy-training (pull_request)Successful in 44s
 CI / server-training-readiness-gate (pull_request)
@@ -429,8 +538,8 @@ coderabbitai[bot]
 @chatgpt-codex-connector
 chatgpt-codex-connector[bot]
 +1 more reviewer
-@gemini-code-assist
-gemini-code-assist[bot]
+@review-assist
+review-assist[bot]
 
 Still in progress?
 Assignees
@@ -625,10 +734,10 @@ commented
 18 minutes ago
 🤖 Hi @voku, I've received your request, and I'm working on it now! You can track my progress in the logs for more details.
 
-gemini-code-assist[bot]
-gemini-code-assist bot reviewed 16 minutes ago
+review-assist[bot]
+review-assist bot reviewed 16 minutes ago
 Contributor
-gemini-code-assist bot
+review-assist bot
 left a comment
 Code Review
 This pull request strengthens split-manifest validation and integrates held-out signer metrics into few-shot trial reports. Key additions include logic for loading model artifacts and evaluating them against a test pool. Feedback highlights a critical issue where path resolution might fail if a non-default data directory is used, as well as opportunities to improve evaluation logic by excluding training examples and optimizing performance by moving redundant manifest processing out of the inner loop.
@@ -639,8 +748,8 @@ server/src/amyserver_tools/train_mlp_fewshot.py
         temp_manifest.write_text(json.dumps({"entries": test_pool}, indent=2), encoding="utf-8")
         test_samples, _ = build_samples_from_manifest(temp_manifest, skip_examples=skip_examples)
 Contributor
-@gemini-code-assist
-gemini-code-assist bot
+@review-assist
+review-assist bot
 16 minutes ago
 high
 
@@ -657,8 +766,8 @@ Comment on lines +470 to +474
                 skip_examples=args.skip_examples,
             )
 Contributor
-@gemini-code-assist
-gemini-code-assist bot
+@review-assist
+review-assist bot
 16 minutes ago
 medium
 
@@ -703,38 +812,38 @@ failing checks
 CI / build (pull_request)
 CI / build (pull_request)Failing after 1m
 skipped checks
-🔀 Gemini Dispatch / debugger (pull_request_review)
-🔀 Gemini Dispatch / debugger (pull_request_review)Skipped 13 minutes ago
-🔀 Gemini Dispatch / debugger (pull_request)
-🔀 Gemini Dispatch / debugger (pull_request)Skipped 18 minutes ago
-🔀 Gemini Dispatch / dispatch (pull_request_review)
-🔀 Gemini Dispatch / dispatch (pull_request_review)Skipped 13 minutes ago
-🔀 Gemini Dispatch / fallthrough (pull_request_review)
-🔀 Gemini Dispatch / fallthrough (pull_request_review)Skipped 13 minutes ago
-🔀 Gemini Dispatch / fallthrough (pull_request)
-🔀 Gemini Dispatch / fallthrough (pull_request)Skipped 18 minutes ago
-🔀 Gemini Dispatch / invoke (pull_request_review)
-🔀 Gemini Dispatch / invoke (pull_request_review)Skipped 13 minutes ago
-🔀 Gemini Dispatch / invoke (pull_request)
-🔀 Gemini Dispatch / invoke (pull_request)Skipped 18 minutes ago
-🔀 Gemini Dispatch / plan-execute (pull_request_review)
-🔀 Gemini Dispatch / plan-execute (pull_request_review)Skipped 13 minutes ago
-🔀 Gemini Dispatch / plan-execute (pull_request)
-🔀 Gemini Dispatch / plan-execute (pull_request)Skipped 18 minutes ago
-🔀 Gemini Dispatch / review (pull_request_review)
-🔀 Gemini Dispatch / review (pull_request_review)Skipped 13 minutes ago
-🔀 Gemini Dispatch / triage (pull_request_review)
-🔀 Gemini Dispatch / triage (pull_request_review)Skipped 13 minutes ago
-🔀 Gemini Dispatch / triage (pull_request)
-🔀 Gemini Dispatch / triage (pull_request)Skipped 18 minutes ago
+🔀 Automation Dispatch / debugger (pull_request_review)
+🔀 Automation Dispatch / debugger (pull_request_review)Skipped 13 minutes ago
+🔀 Automation Dispatch / debugger (pull_request)
+🔀 Automation Dispatch / debugger (pull_request)Skipped 18 minutes ago
+🔀 Automation Dispatch / dispatch (pull_request_review)
+🔀 Automation Dispatch / dispatch (pull_request_review)Skipped 13 minutes ago
+🔀 Automation Dispatch / fallthrough (pull_request_review)
+🔀 Automation Dispatch / fallthrough (pull_request_review)Skipped 13 minutes ago
+🔀 Automation Dispatch / fallthrough (pull_request)
+🔀 Automation Dispatch / fallthrough (pull_request)Skipped 18 minutes ago
+🔀 Automation Dispatch / invoke (pull_request_review)
+🔀 Automation Dispatch / invoke (pull_request_review)Skipped 13 minutes ago
+🔀 Automation Dispatch / invoke (pull_request)
+🔀 Automation Dispatch / invoke (pull_request)Skipped 18 minutes ago
+🔀 Automation Dispatch / plan-execute (pull_request_review)
+🔀 Automation Dispatch / plan-execute (pull_request_review)Skipped 13 minutes ago
+🔀 Automation Dispatch / plan-execute (pull_request)
+🔀 Automation Dispatch / plan-execute (pull_request)Skipped 18 minutes ago
+🔀 Automation Dispatch / review (pull_request_review)
+🔀 Automation Dispatch / review (pull_request_review)Skipped 13 minutes ago
+🔀 Automation Dispatch / triage (pull_request_review)
+🔀 Automation Dispatch / triage (pull_request_review)Skipped 13 minutes ago
+🔀 Automation Dispatch / triage (pull_request)
+🔀 Automation Dispatch / triage (pull_request)Skipped 18 minutes ago
 neutral checks
 Mend Security Check
 Mend Security Check — Security Report
 successful checks
-🔀 Gemini Dispatch / dispatch (pull_request)
-🔀 Gemini Dispatch / dispatch (pull_request)Successful in 7s
-🔀 Gemini Dispatch / review / review (pull_request)
-🔀 Gemini Dispatch / review / review (pull_request)Successful in 6s
+🔀 Automation Dispatch / dispatch (pull_request)
+🔀 Automation Dispatch / dispatch (pull_request)Successful in 7s
+🔀 Automation Dispatch / review / review (pull_request)
+🔀 Automation Dispatch / review / review (pull_request)Successful in 6s
 CI / integration-heavy-training (pull_request)
 CI / integration-heavy-training (pull_request)Successful in 4m
 CI / server-training-readiness-gate (pull_request)
@@ -777,8 +886,8 @@ Remember, contributions to this repository should follow our GitHub Community Gu
  ProTip! Add .patch or .diff to the end of URLs for Git’s plaintext views.
 Reviewers
 1 more reviewer
-@gemini-code-assist
-gemini-code-assist[bot]
+@review-assist
+review-assist[bot]
 
 Still in progress?
 Assignees
