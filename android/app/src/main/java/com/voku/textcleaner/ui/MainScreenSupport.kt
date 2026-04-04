@@ -5,6 +5,7 @@ import com.voku.textcleaner.core.CleanedResult
 import com.voku.textcleaner.core.SourceType
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.UUID
 
 internal data class SamplePreset(
     val text: String,
@@ -191,7 +192,7 @@ internal fun appendHistory(
 ): List<HistoryItem> {
     val updated = listOf(
         HistoryItem(
-            id = "${System.currentTimeMillis()}-${rawText.hashCode()}",
+            id = UUID.randomUUID().toString(),
             timestamp = System.currentTimeMillis(),
             rawText = rawText,
             preset = preset,

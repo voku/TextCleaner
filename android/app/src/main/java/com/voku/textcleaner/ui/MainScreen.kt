@@ -5,8 +5,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.ManagedActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -625,7 +627,7 @@ private fun activeExportForTab(
 
 private fun requestSave(
     export: TabExport,
-    launcher: androidx.activity.compose.ManagedActivityResultLauncher<String, android.net.Uri?>,
+    launcher: ManagedActivityResultLauncher<String, Uri?>,
     pendingExportSetter: (PendingExport) -> Unit,
 ) {
     if (export.text.isBlank()) {
