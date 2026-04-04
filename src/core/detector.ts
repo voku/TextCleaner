@@ -40,7 +40,7 @@ export function detectSourceType(rawText: string, cleanedText?: string): SourceT
       chatLineCount++;
     }
   }
-  if (chatLineCount >= 3 || slackPattern.test(lowerRaw)) {
+  if ((chatLineCount >= 3 && lines.length >= 5) || slackPattern.test(lowerRaw)) {
     return 'chat';
   }
 

@@ -76,15 +76,15 @@ The workflow sets `VITE_BASE_PATH=/TextCleaner/` so built assets resolve correct
 
 ## Key files
 
-- `/home/runner/work/TextCleaner/TextCleaner/src/App.tsx` — main UI
-- `/home/runner/work/TextCleaner/TextCleaner/src/core/engine.ts` — cleanup pipeline
-- `/home/runner/work/TextCleaner/TextCleaner/src/core/detector.ts` — source detection
-- `/home/runner/work/TextCleaner/TextCleaner/src/core/rules/generic.ts` — generic cleanup rules
-- `/home/runner/work/TextCleaner/TextCleaner/src/core/rules/github.ts` — GitHub-specific cleanup rules
-- `/home/runner/work/TextCleaner/TextCleaner/src/core/rules/docs.ts` — documentation cleanup rules
-- `/home/runner/work/TextCleaner/TextCleaner/src/core/rules/article.ts` — article cleanup rules
-- `/home/runner/work/TextCleaner/TextCleaner/src/core/rules/chat.ts` — chat cleanup rules
-- `/home/runner/work/TextCleaner/TextCleaner/src/core/__tests__/engine.test.ts` — cleanup tests
+- `src/App.tsx` — main UI
+- `src/core/engine.ts` — cleanup pipeline
+- `src/core/detector.ts` — source detection
+- `src/core/rules/generic.ts` — generic cleanup rules
+- `src/core/rules/github.ts` — GitHub-specific cleanup rules
+- `src/core/rules/docs.ts` — documentation cleanup rules
+- `src/core/rules/article.ts` — article cleanup rules
+- `src/core/rules/chat.ts` — chat cleanup rules
+- `src/core/__tests__/engine.test.ts` — cleanup tests
 
 ## Helper prompt: Key Files Detector
 
