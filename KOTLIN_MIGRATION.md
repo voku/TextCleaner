@@ -26,7 +26,7 @@ All core cleanup logic has been ported with full test parity:
 
 - `MainScreen` composable with Raw / Cleaned / Markdown / Prompt tabs
 - Preset dropdown (Auto-detect + all source types)
-- Copy and Share action buttons
+- Sample loader, local history, cleanup-logic viewer, and save/export actions
 - Status bar showing detected type, removed line count, and warnings
 
 ### Milestone 3: Android entry points — ✅ Complete
@@ -35,9 +35,8 @@ All core cleanup logic has been ported with full test parity:
 - `ACTION_SEND` intent filter: system share-sheet integration
 - "Return Cleaned Text" button for `PROCESS_TEXT` callers
 
-### Milestone 4: Polish — future
+### Milestone 4: Polish — in progress
 
-- Local history / persistence
 - Performance tuning for very large texts
 - Accessibility audit
 - Play Store release preparation
@@ -70,10 +69,12 @@ Ported as an `object Detector` with a `detectSourceType(rawText, cleanedText?)` 
 
 ## UI
 The Jetpack Compose UI in `ui/MainScreen.kt` mirrors the web app's tab layout:
-- **Raw** tab: editable text field for manual paste
-- **Cleaned** tab: read-only cleaned output with copy/share
-- **Markdown** tab: formatted markdown output with copy/share
-- **Prompt** tab: LLM prompt output with copy/share
+- **Raw** tab: editable text field for manual paste with sample loading and export actions
+- **Cleaned** tab: read-only cleaned output with copy/share/save
+- **Markdown** tab: formatted markdown output with copy/share/save
+- **Prompt** tab: LLM prompt output with copy/share/save
+- **History sheet**: persistent restore/delete/clear flow for recent cleanups
+- **Cleanup logic sheet**: bundled source viewer for the native cleanup engine and rules
 
 ## Project Structure
 
