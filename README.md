@@ -116,17 +116,18 @@ Requires JDK 17 and the Android SDK (API 35).
 
 ```bash
 cd android
-./gradlew assembleDebug
-# APK: app/build/outputs/apk/debug/app-debug.apk
+./gradlew testCiUnitTest assembleCi
+# APK: app/build/outputs/apk/ci/app-ci.apk
 ```
 
 ### Android CI
 
 The repository includes a `build-android.yml` workflow that:
 
-1. builds the debug APK with Gradle,
-2. attaches it to the rolling pre-release tag `android-latest`, and
-3. uploads it as a workflow artifact (retained for 30 days).
+1. runs the Android unit tests,
+2. builds a minified resource-shrunk CI APK signed with the debug key,
+3. attaches it to the rolling pre-release tag `android-latest`, and
+4. uploads it as a workflow artifact (retained for 30 days).
 
 The release is updated automatically on every push to `main`.
 
