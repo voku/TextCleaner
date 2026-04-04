@@ -25,7 +25,7 @@ internal data class LoadedCodeSnippet(
     val content: String,
 )
 
-internal val sampleByPreset = mapOf<SourceType?, SamplePreset>(
+internal val samplesByPreset = mapOf<SourceType?, SamplePreset>(
     null to SamplePreset(
         preset = null,
         text = """Skip to content

@@ -201,7 +201,9 @@ fun MainScreen(
 
                 OutlinedButton(
                     onClick = {
-                        val sample = sampleByPreset[selectedPreset] ?: sampleByPreset.getValue(null)
+                        val sample = samplesByPreset[selectedPreset]
+                            ?: samplesByPreset[null]
+                            ?: SamplePreset("", null)
                         rawText = sample.text
                         selectedPreset = sample.preset
                     },
@@ -284,7 +286,7 @@ fun MainScreen(
             if (currentResult != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Detected: ${sourceTypeLabels[currentResult.detectedType] ?: "Unknown"} · Removed ${currentResult.removedLineCount} lines",
+                    text = "Detected: ${sourceTypeLabels.getValue(currentResult.detectedType)} · Removed ${currentResult.removedLineCount} lines",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary,
                 )
@@ -481,7 +483,7 @@ private fun HistorySheet(
                                     }
                                 }
                                 Text(
-                                    text = sourceTypeLabels[item.result.detectedType] ?: "Unknown",
+                                    text = sourceTypeLabels.getValue(item.result.detectedType),
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
                                 Text(
