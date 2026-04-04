@@ -1,5 +1,8 @@
 import { SourceType } from './types';
 
+const MIN_CHAT_MATCHES = 3;
+const MIN_CHAT_TOTAL_LINES = 5;
+
 export function detectSourceType(rawText: string, cleanedText?: string): SourceType {
   const lowerRaw = rawText.toLowerCase();
   const textToAnalyze = cleanedText || rawText;
@@ -40,7 +43,7 @@ export function detectSourceType(rawText: string, cleanedText?: string): SourceT
       chatLineCount++;
     }
   }
-  if ((chatLineCount >= 3 && lines.length >= 5) || slackPattern.test(lowerRaw)) {
+  if ((chatLineCount >= MIN_CHAT_MATCHES && lines.length >= MIN_CHAT_TOTAL_LINES) || slackPattern.test(lowerRaw)) {
     return 'chat';
   }
 
