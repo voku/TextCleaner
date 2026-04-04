@@ -1,6 +1,7 @@
 package com.voku.textcleaner
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -31,8 +32,14 @@ class OverlayActivity : ComponentActivity() {
             return
         }
 
+        // Read night-mode from the *application* context so that the activity's Light XML
+        // theme (Theme.TextCleaner.Overlay extends Material.Light) cannot suppress the
+        // system dark-mode flag and cause Compose's isSystemInDarkTheme() to return false.
+        val isDarkMode = (applicationContext.resources.configuration.uiMode
+            and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+
         setContent {
-            TextCleanerTheme {
+            TextCleanerTheme(darkTheme = isDarkMode) {
                 OverlayScreen(
                     initialText = text,
                     isProcessText = isProcessText,
