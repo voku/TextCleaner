@@ -73,6 +73,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.voku.textcleaner.R
 import com.voku.textcleaner.core.CleanedResult
 import com.voku.textcleaner.core.Engine
 import com.voku.textcleaner.core.RawInput
@@ -113,11 +114,10 @@ private val tabTitles = listOf("Raw", "Cleaned", "Markdown", "Prompt")
 private val maxHistorySheetHeight = 420.dp
 private val appCardShape = RoundedCornerShape(24.dp)
 private val panelShape = RoundedCornerShape(18.dp)
-private const val CLEANING_DEBOUNCE_MS = 200L
+private const val CLEANING_DEBOUNCE_MILLIS = 200L
 private const val WARNING_CARD_BACKGROUND_ALPHA = 0.72f
 private const val WARNING_CARD_BORDER_ALPHA = 0.35f
 private const val MAIN_SCREEN_TAG = "TextCleanerMainScreen"
-private const val REPOSITORY_URL = "https://github.com/voku/TextCleaner/"
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -189,7 +189,7 @@ fun MainScreen(
         if (text.isNotBlank() && !isCleaning) {
             scope.launch {
                 isCleaning = true
-                delay(CLEANING_DEBOUNCE_MS)
+                delay(CLEANING_DEBOUNCE_MILLIS)
                 cleanCurrentText(text)
                 isCleaning = false
             }
@@ -1159,7 +1159,7 @@ private fun currentTabExport(
 }
 
 private fun openRepository(context: Context) {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(REPOSITORY_URL)).apply {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(context.getString(R.string.repository_url))).apply {
         if (context !is Activity) {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
