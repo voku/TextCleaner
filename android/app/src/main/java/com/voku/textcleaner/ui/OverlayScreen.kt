@@ -67,6 +67,12 @@ import kotlinx.coroutines.withContext
 
 private val overlayPanelShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
 
+// Scrollbar thumb geometry
+private val ScrollbarWidth = 3.dp
+private val ScrollbarEdgeOffset = 4.dp
+private val ScrollbarCornerRadius = 2.dp
+private val ScrollbarMinThumbHeight = 24.dp
+
 /**
  * Compact bottom-panel that renders inside a translucent [OverlayActivity].
  *
@@ -202,15 +208,15 @@ fun OverlayScreen(
                                     val viewportH = size.height
                                     val totalH = viewportH + scrollState.maxValue
                                     val thumbH = (viewportH * viewportH / totalH)
-                                        .coerceAtLeast(24.dp.toPx())
+                                        .coerceAtLeast(ScrollbarMinThumbHeight.toPx())
                                     val scrollFraction =
                                         scrollState.value.toFloat() / scrollState.maxValue.toFloat()
                                     val thumbTop = scrollFraction * (viewportH - thumbH)
                                     drawRoundRect(
                                         color = scrollbarColor,
-                                        topLeft = Offset(size.width - 4.dp.toPx(), thumbTop),
-                                        size = Size(3.dp.toPx(), thumbH),
-                                        cornerRadius = CornerRadius(2.dp.toPx()),
+                                        topLeft = Offset(size.width - ScrollbarEdgeOffset.toPx(), thumbTop),
+                                        size = Size(ScrollbarWidth.toPx(), thumbH),
+                                        cornerRadius = CornerRadius(ScrollbarCornerRadius.toPx()),
                                     )
                                 }
                             }
