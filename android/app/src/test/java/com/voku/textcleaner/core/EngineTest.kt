@@ -340,7 +340,7 @@ Owner
 voku
 commented
 1 hour ago
-$BULLET 
+${'$'}BULLET 
 Motivation
 Reduce time-to-root-cause for MediaPipe/gesture runtime incidents by surfacing backend delegate, module readiness, model URLs, and initialization errors in a single diagnostic snapshot.
 Make error and health logs immediately actionable for on-call by including runtime context alongside error payloads.
@@ -418,7 +418,7 @@ Contributor
 coderabbitai bot
 commented
 1 hour ago
-$BULLET 
+${'$'}BULLET 
 Walkthrough
 This pull request introduces runtime diagnostics instrumentation to the gesture detection system. A new getRuntimeDiagnostics() method was added to track delegate selection (GPU/CPU/null), module readiness states, and initialization errors. The orchestrator's status now includes runtime diagnostic data. Supporting documentation was added, and the completed R&D item was moved to the done list.
 
