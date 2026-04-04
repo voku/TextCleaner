@@ -1,6 +1,6 @@
 # TextCleaner
 
-TextCleaner is a browser-based utility for cleaning noisy copied text before you paste it into an LLM, issue comment, document, or note.
+TextCleaner is a web and Android utility for cleaning noisy copied text before you paste it into an LLM, issue comment, document, or note.
 
 It removes obvious site chrome from copied content such as GitHub pull requests, GitHub issues, documentation pages, articles, and chat transcripts while preserving the lines that matter.
 
@@ -18,8 +18,8 @@ It removes obvious site chrome from copied content such as GitHub pull requests,
   - Cleaned text
   - Markdown excerpt
   - Reusable prompt text
-- Local history stored in the browser
-- Export helpers for copy and download
+- Local history in the web and Android apps
+- Export helpers for copy and download/save
 
 ## How it works
 
