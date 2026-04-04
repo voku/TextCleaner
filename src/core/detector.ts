@@ -1,5 +1,8 @@
 import { SourceType } from './types';
 
+const MIN_CHAT_MATCHES = 3;
+const MIN_CHAT_TOTAL_LINES = 5;
+
 export function detectSourceType(rawText: string, cleanedText?: string): SourceType {
   const lowerRaw = rawText.toLowerCase();
   const textToAnalyze = cleanedText || rawText;
@@ -40,26 +43,35 @@ export function detectSourceType(rawText: string, cleanedText?: string): SourceT
       chatLineCount++;
     }
   }
-  if (chatLineCount > 3 || slackPattern.test(lowerRaw)) {
+  if ((chatLineCount >= MIN_CHAT_MATCHES && lines.length >= MIN_CHAT_TOTAL_LINES) || slackPattern.test(lowerRaw)) {
     return 'chat';
   }
 
   // Docs/Article
   // Heuristic: Check the cleaned text for paragraph density and headings
-  // We consider a "long line" as a proxy for a paragraph if lines aren't wrapped
+  // We consider a mix of long lines, headings, list items, and docs/article keywords.
   const longLines = lines.filter(l => l.length > 80).length;
+  const paragraphLines = lines.filter(l => l.length > 40).length;
   const headings = (textToAnalyze.match(/^#+\s/gm) || []).length;
   const listItems = (textToAnalyze.match(/^[-*]\s/gm) || []).length;
-  
-  if (longLines > 3 && headings > 0) {
+  const docsKeywords = ['api', 'documentation', 'tutorial', 'guide', 'reference', 'install', 'configuration'];
+  const articleKeywords = ['article', 'analysis', 'opinion', 'story', 'interview', 'essay'];
+  const docsKeywordMatches = docsKeywords.filter(keyword => lowerCleaned.includes(keyword)).length;
+  const articleKeywordMatches = articleKeywords.filter(keyword => lowerCleaned.includes(keyword)).length;
+
+  if ((headings > 0 && listItems >= 2) || docsKeywordMatches >= 2) {
+    return 'docs';
+  }
+
+  if ((headings > 0 && paragraphLines >= 2) || longLines > 3) {
     // Distinguish between docs and article
-    if (listItems > longLines * 2 || lowerCleaned.includes('api') || lowerCleaned.includes('documentation') || lowerCleaned.includes('tutorial')) {
+    if (listItems > 2 || docsKeywordMatches >= articleKeywordMatches + 1) {
       return 'docs';
     }
     return 'article';
   }
-  
-  if (longLines > 5) {
+
+  if (paragraphLines >= 3 || articleKeywordMatches > 0) {
     return 'article';
   }
 

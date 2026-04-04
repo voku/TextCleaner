@@ -2,10 +2,22 @@ import { CleanedResult, CleanupRuleSet, RawInput, SourceType } from './types';
 import { detectSourceType } from './detector';
 import { GenericRuleSet } from './rules/generic';
 import { GitHubRuleSet } from './rules/github';
+import { DocsRuleSet } from './rules/docs';
+import { ArticleRuleSet } from './rules/article';
+import { ChatRuleSet } from './rules/chat';
 
 export function getRuleSetForType(type: SourceType): CleanupRuleSet {
   if (type === 'github_pr' || type === 'github_issue') {
     return GitHubRuleSet;
+  }
+  if (type === 'docs') {
+    return DocsRuleSet;
+  }
+  if (type === 'article') {
+    return ArticleRuleSet;
+  }
+  if (type === 'chat') {
+    return ChatRuleSet;
   }
   return GenericRuleSet;
 }
@@ -156,13 +168,69 @@ export function collapseBlankLines(lines: string[]): string[] {
   return result;
 }
 
-export function generateMarkdown(text: string): string {
-  // Simple markdown wrapper for now
-  return text;
+function formatSourceTypeLabel(type: SourceType): string {
+  switch (type) {
+    case 'github_pr':
+      return 'GitHub Pull Request';
+    case 'github_issue':
+      return 'GitHub Issue';
+    case 'docs':
+      return 'Documentation';
+    case 'article':
+      return 'Article';
+    case 'chat':
+      return 'Chat';
+    default:
+      return 'Text';
+  }
+}
+
+function normalizeMarkdownBody(lines: string[], type: SourceType): string[] {
+  if (type === 'chat') {
+    return lines.map(line => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        return '';
+      }
+
+      if (
+        trimmed.startsWith('- ') ||
+        trimmed.startsWith('* ') ||
+        trimmed.startsWith('> ') ||
+        trimmed.startsWith('#')
+      ) {
+        return trimmed;
+      }
+
+      return `- ${trimmed}`;
+    });
+  }
+
+  return lines;
+}
+
+export function generateMarkdown(text: string, type: SourceType): string {
+  const lines = normalizeText(text);
+  if (lines.length === 0) {
+    return '';
+  }
+
+  const title = `# Cleaned ${formatSourceTypeLabel(type)} Excerpt`;
+  const body = normalizeMarkdownBody(lines, type).join('\n');
+
+  return `${title}\n\n${body}`.trim();
 }
 
 export function generatePrompt(text: string, type: SourceType): string {
-  return `Please review the following content extracted from a ${type}:\n\n${text}\n\n`;
+  const typeLabel = formatSourceTypeLabel(type);
+
+  return [
+    `Review the following cleaned ${typeLabel.toLowerCase()} excerpt.`,
+    'Focus on the substantive content and ignore any residual site chrome.',
+    '',
+    text,
+    '',
+  ].join('\n');
 }
 
 export function cleanText(input: RawInput, ruleSetOverride?: CleanupRuleSet): CleanedResult {
@@ -202,7 +270,7 @@ export function cleanText(input: RawInput, ruleSetOverride?: CleanupRuleSet): Cl
   return {
     detectedType,
     cleanedText,
-    markdownText: generateMarkdown(cleanedText),
+    markdownText: generateMarkdown(cleanedText, detectedType),
     llmPromptText: generatePrompt(cleanedText, detectedType),
     removedLineCount,
     warnings: removedLineCount === 0 && originalLines.length > 10 ? ['Low confidence: No lines were removed.'] : [],

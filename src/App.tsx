@@ -11,6 +11,131 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './comp
 
 type Tab = 'raw' | 'cleaned' | 'markdown' | 'prompt';
 
+const presetOptions: Array<{value: SourceType | 'auto'; label: string}> = [
+  {value: 'auto', label: 'Auto-detect'},
+  {value: 'generic', label: 'Generic text'},
+  {value: 'github_pr', label: 'GitHub pull request'},
+  {value: 'github_issue', label: 'GitHub issue'},
+  {value: 'docs', label: 'Documentation'},
+  {value: 'article', label: 'Article'},
+  {value: 'chat', label: 'Chat transcript'},
+];
+
+const sourceTypeLabels: Record<SourceType, string> = {
+  generic: 'Generic text',
+  github_pr: 'GitHub pull request',
+  github_issue: 'GitHub issue',
+  docs: 'Documentation',
+  article: 'Article',
+  chat: 'Chat transcript',
+};
+
+const sampleByPreset: Record<SourceType | 'auto', {text: string; preset: SourceType | 'auto'}> = {
+  auto: {
+    preset: 'auto',
+    text: `Skip to content
+Navigation Menu
+Pull requests
+Issues
+# Fix the bug
+This PR fixes the bug.
+Files changed
+1
+Commits
+2
+Review
+requested changes
+Copy link
+Quote reply
+Terms
+Privacy`,
+  },
+  generic: {
+    preset: 'generic',
+    text: `Menu
+Sign in
+Quarterly planning notes
+We want a short summary of the current release risks and the mitigation plan.
+Advertisement
+More content follows here.
+Footer
+Terms`,
+  },
+  github_pr: {
+    preset: 'github_pr',
+    text: `Skip to content
+Navigation Menu
+Pull requests
+Issues
+# Fix the bug
+This PR fixes the bug.
+Files changed
+1
+Commits
+2
+Review
+requested changes
+Copy link
+Quote reply
+Terms
+Privacy`,
+  },
+  github_issue: {
+    preset: 'github_issue',
+    text: `Skip to content
+Repository navigation
+Issues
+# Crash in export flow
+Open issue
+Labels
+bug
+Assignees
+No one assigned
+The export flow crashes when a draft document contains emoji.
+Comment
+Terms
+Privacy`,
+  },
+  docs: {
+    preset: 'docs',
+    text: `Documentation
+Table of contents
+On this page
+# Deploying TextCleaner
+Use the production build for GitHub Pages deployments.
+
+## Build
+Run npm run build to generate the dist directory.
+
+Edit this page
+Back to top
+Was this page helpful?`,
+  },
+  article: {
+    preset: 'article',
+    text: `Latest
+8 min read
+# Why clean copied text before prompting
+Clean input reduces irrelevant context and makes summaries more reliable.
+
+Related articles
+Sign up for our newsletter
+Continue reading`,
+  },
+  chat: {
+    preset: 'chat',
+    text: `Messages
+Jump to present
+Today
+John Doe 10:42 AM
+Can you review the cleaned output before release?
+Jane Smith 10:43 AM
+Yes — please send the GitHub Pages URL when it is ready.
+Reply in thread
+Typing…`,
+  },
+};
+
 interface HistoryItem {
   id: string;
   timestamp: number;
@@ -94,23 +219,9 @@ export default function App() {
   };
 
   const handlePasteSample = () => {
-    setRawText(`Skip to content
-Navigation Menu
-Pull requests
-Issues
-# Fix the bug
-This PR fixes the bug.
-Files changed
-1
-Commits
-2
-Review
-requested changes
-Copy link
-Quote reply
-Terms
-Privacy`);
-    setPreset('github_pr');
+    const sample = sampleByPreset[preset];
+    setRawText(sample.text);
+    setPreset(sample.preset);
   };
 
   const restoreHistoryItem = (item: HistoryItem) => {
@@ -160,7 +271,18 @@ Privacy`);
           <header className="flex items-center justify-between space-y-0 text-center sm:text-left">
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-gray-900">Text Cleaner</h1>
-              <p className="text-gray-500">Clean noisy text from mobile web pages for LLM context.</p>
+              <p className="text-gray-500">Clean noisy text from GitHub, docs, articles, and chat before sending it to an LLM.</p>
+              <p className="mt-2 text-sm text-gray-600">
+                Production-first web release. Android native work stays on the roadmap for a later phase.{' '}
+                <a
+                  href="https://github.com/voku/TextCleaner/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-indigo-600 hover:text-indigo-700 underline underline-offset-2"
+                >
+                  Contribute on GitHub
+                </a>
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <Tooltip>
@@ -201,13 +323,15 @@ Privacy`);
                 <select
                   id="preset"
                   value={preset}
-                  onChange={(e) => setPreset(e.target.value as any)}
+                  onChange={(e) => setPreset(e.target.value as SourceType | 'auto')}
                   className="block w-full lg:w-48 rounded-md border-gray-300 py-2 pl-3 pr-10 text-gray-900 focus:ring-2 focus:ring-indigo-600 sm:text-sm border transition-shadow"
                   aria-label="Select parsing preset"
                 >
-                  <option value="auto">Auto-detect</option>
-                  <option value="generic">Generic</option>
-                  <option value="github_pr">GitHub PR/Issue</option>
+                  {presetOptions.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </div>
               
@@ -224,7 +348,7 @@ Privacy`);
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Load a sample GitHub PR text</p>
+                    <p>Load a sample for the selected preset</p>
                   </TooltipContent>
                 </Tooltip>
 
@@ -425,7 +549,7 @@ Privacy`);
               <div className="p-4 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-sm text-gray-500">
                 <div className="flex flex-wrap gap-4">
                   <div>
-                    Detected type: <span className="font-medium text-gray-900">{result.detectedType}</span>
+                    Detected type: <span className="font-medium text-gray-900">{sourceTypeLabels[result.detectedType]}</span>
                   </div>
                   <div>
                     Removed lines: <span className="font-medium text-gray-900">{result.removedLineCount}</span>
@@ -513,7 +637,7 @@ Privacy`);
                         </button>
                       </div>
                       <div className="text-sm font-medium text-gray-900 mb-1">
-                        {item.result.detectedType}
+                        {sourceTypeLabels[item.result.detectedType]}
                       </div>
                       <div className="text-xs text-gray-600 line-clamp-2 font-mono bg-gray-50 p-1.5 rounded border border-gray-100">
                         {item.rawText}
