@@ -17,6 +17,10 @@ internal val CodePanelBackground = Color(0xFF111827)
 internal val CodePanelBorder = Color(0xFF374151)
 internal val CodePanelTitle = Color(0xFFF9FAFB)
 internal val CodePanelContent = Color(0xFFE5E7EB)
+internal val WarningBackground = Color(0xFFFFFBEB)
+internal val WarningBorder = Color(0xFFFDE68A)
+internal val WarningTitle = Color(0xFF92400E)
+internal val WarningText = Color(0xFF78350F)
 
 private val LightColors = lightColorScheme(
     primary = Indigo600,

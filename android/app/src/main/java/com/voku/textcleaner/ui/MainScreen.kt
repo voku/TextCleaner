@@ -24,7 +24,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.AutoFixHigh
+import androidx.compose.material.icons.filled.Code
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -82,6 +97,10 @@ import com.voku.textcleaner.ui.theme.CodePanelBackground
 import com.voku.textcleaner.ui.theme.CodePanelBorder
 import com.voku.textcleaner.ui.theme.CodePanelContent
 import com.voku.textcleaner.ui.theme.CodePanelTitle
+import com.voku.textcleaner.ui.theme.WarningBackground
+import com.voku.textcleaner.ui.theme.WarningBorder
+import com.voku.textcleaner.ui.theme.WarningText
+import com.voku.textcleaner.ui.theme.WarningTitle
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.delay
@@ -115,8 +134,6 @@ private val maxHistorySheetHeight = 420.dp
 private val appCardShape = RoundedCornerShape(24.dp)
 private val panelShape = RoundedCornerShape(18.dp)
 private const val CLEANING_DEBOUNCE_MILLIS = 200L
-private const val WARNING_CARD_BACKGROUND_ALPHA = 0.72f
-private const val WARNING_CARD_BORDER_ALPHA = 0.35f
 private const val MAIN_SCREEN_TAG = "TextCleanerMainScreen"
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -217,6 +234,14 @@ fun MainScreen(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground,
                 ),
+                actions = {
+                    IconButton(onClick = { showCodeSheet = true }) {
+                        Icon(Icons.Default.Code, contentDescription = "View cleanup logic")
+                    }
+                    IconButton(onClick = { showHistorySheet = true }) {
+                        Icon(Icons.Default.History, contentDescription = "View local history")
+                    }
+                },
             )
         },
     ) { padding ->
@@ -229,8 +254,6 @@ fun MainScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             HeroSection(
-                onOpenCode = { showCodeSheet = true },
-                onOpenHistory = { showHistorySheet = true },
                 onOpenGitHub = { openRepository(context) },
             )
 
@@ -320,6 +343,7 @@ fun MainScreen(
                             )
 
                             1 -> ReadOnlyOutput(
+                                title = "Cleaned text",
                                 text = result?.cleanedText.orEmpty(),
                                 placeholder = "Cleaned text will appear here…",
                                 context = context,
@@ -328,6 +352,7 @@ fun MainScreen(
                             )
 
                             2 -> ReadOnlyOutput(
+                                title = "Markdown",
                                 text = result?.markdownText.orEmpty(),
                                 placeholder = "Markdown will appear here…",
                                 context = context,
@@ -336,6 +361,7 @@ fun MainScreen(
                             )
 
                             3 -> ReadOnlyOutput(
+                                title = "LLM Prompt",
                                 text = result?.llmPromptText.orEmpty(),
                                 placeholder = "LLM prompt will appear here…",
                                 context = context,
@@ -415,8 +441,6 @@ fun MainScreen(
 
 @Composable
 private fun HeroSection(
-    onOpenCode: () -> Unit,
-    onOpenHistory: () -> Unit,
     onOpenGitHub: () -> Unit,
 ) {
     Card(
@@ -443,51 +467,13 @@ private fun HeroSection(
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.secondary,
             )
-            Text(
-                text = "This Android UI now mirrors the web layout more closely with the same presets, tab flow, history, and cleanup logic viewer.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.secondary,
-            )
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-                val compact = maxWidth < 460.dp
-                if (compact) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(
-                            onClick = onOpenCode,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("Cleanup logic")
-                        }
-                        OutlinedButton(
-                            onClick = onOpenHistory,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("Local history")
-                        }
-                        TextButton(
-                            onClick = onOpenGitHub,
-                            modifier = Modifier.fillMaxWidth(),
-                        ) {
-                            Text("Contribute on GitHub")
-                        }
-                    }
-                } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        OutlinedButton(onClick = onOpenCode) {
-                            Text("Cleanup logic")
-                        }
-                        OutlinedButton(onClick = onOpenHistory) {
-                            Text("Local history")
-                        }
-                        Spacer(modifier = Modifier.weight(1f))
-                        TextButton(onClick = onOpenGitHub) {
-                            Text("Contribute on GitHub")
-                        }
-                    }
-                }
+            TextButton(
+                onClick = onOpenGitHub,
+                modifier = Modifier.align(Alignment.End),
+            ) {
+                Icon(Icons.Default.OpenInNew, contentDescription = "Opens in browser", modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("Contribute on GitHub")
             }
         }
     }
@@ -504,11 +490,6 @@ private fun ControlsSection(
     isCleaning: Boolean,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(
-            text = "Use the same preset-first workflow as the web app, then switch between raw, cleaned, markdown, and prompt-ready output.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.secondary,
-        )
         BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
             val compact = maxWidth < 560.dp
             if (compact) {
@@ -531,18 +512,26 @@ private fun ControlsSection(
                                     }
                                 },
                         ) {
+                            if (!isCleaning) {
+                                Icon(Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
                             Text(if (isCleaning) "Cleaning…" else "Clean text")
                         }
                         OutlinedButton(
                             onClick = onLoadSample,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
+                            Icon(Icons.Default.Article, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text("Load sample")
                         }
                         OutlinedButton(
                             onClick = onReset,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text("Reset")
                         }
                     }
@@ -659,6 +648,7 @@ private fun RawTextPanel(
 
 @Composable
 private fun ReadOnlyOutput(
+    title: String,
     text: String,
     placeholder: String,
     context: Context,
@@ -684,7 +674,7 @@ private fun ReadOnlyOutput(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = filename,
+                        text = title,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -825,9 +815,9 @@ private fun WarningCard(warnings: List<String>) {
         modifier = Modifier.fillMaxWidth(),
         shape = panelShape,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = WARNING_CARD_BACKGROUND_ALPHA),
+            containerColor = WarningBackground,
         ),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = WARNING_CARD_BORDER_ALPHA)),
+        border = BorderStroke(1.dp, WarningBorder),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -837,13 +827,13 @@ private fun WarningCard(warnings: List<String>) {
                 text = "Warnings",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.error,
+                color = WarningTitle,
             )
             warnings.forEach { warning ->
                 Text(
                     text = "• $warning",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color = WarningText,
                 )
             }
         }
@@ -857,32 +847,15 @@ private fun InlineActionButtons(
     onSave: () -> Unit,
     saveLabel: String = "Save",
 ) {
-    BoxWithConstraints {
-        val compact = maxWidth < 220.dp
-        if (compact) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onCopy, modifier = Modifier.fillMaxWidth()) {
-                    Text("Copy")
-                }
-                OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth()) {
-                    Text("Share")
-                }
-                OutlinedButton(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
-                    Text(saveLabel)
-                }
-            }
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onCopy) {
-                    Text("Copy")
-                }
-                OutlinedButton(onClick = onShare) {
-                    Text("Share")
-                }
-                OutlinedButton(onClick = onSave) {
-                    Text(saveLabel)
-                }
-            }
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        IconButton(onClick = onCopy) {
+            Icon(Icons.Default.ContentCopy, contentDescription = "Copy")
+        }
+        IconButton(onClick = onShare) {
+            Icon(Icons.Default.Share, contentDescription = "Share")
+        }
+        IconButton(onClick = onSave) {
+            Icon(Icons.Default.Download, contentDescription = saveLabel)
         }
     }
 }
@@ -896,12 +869,18 @@ private fun FullWidthActionButtons(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(onClick = onCopy, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text("Copy")
         }
         OutlinedButton(onClick = onShare, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text("Share")
         }
         OutlinedButton(onClick = onSave, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(modifier = Modifier.width(8.dp))
             Text("Save $saveLabel")
         }
     }
@@ -990,6 +969,8 @@ private fun HistorySheet(
                                         color = MaterialTheme.colorScheme.secondary,
                                     )
                                     TextButton(onClick = { onDelete(item.id) }) {
+                                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
                                         Text("Delete")
                                     }
                                 }
@@ -1024,6 +1005,8 @@ private fun HistorySheet(
                     onClick = onClear,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
+                    Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text("Clear all history")
                 }
             }
@@ -1074,6 +1057,8 @@ private fun CodeSheet(
                                 fontWeight = FontWeight.SemiBold,
                             )
                             TextButton(onClick = { onCopy(snippet.title, snippet.content) }) {
+                                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text("Copy")
                             }
                         }
