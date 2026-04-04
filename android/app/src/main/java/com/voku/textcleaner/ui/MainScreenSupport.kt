@@ -210,7 +210,7 @@ internal fun loadCodeSnippets(context: Context): List<LoadedCodeSnippet> =
             content = runCatching {
                 context.assets.open(source.assetPath).bufferedReader().use { it.readText() }
             }.getOrElse {
-                "Unable to load ${source.title}."
+                "Unable to load ${source.title}: ${it.message ?: "unknown error"}"
             },
         )
     }

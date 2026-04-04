@@ -202,8 +202,7 @@ fun MainScreen(
                 OutlinedButton(
                     onClick = {
                         val sample = samplesByPreset[selectedPreset]
-                            ?: samplesByPreset[null]
-                            ?: SamplePreset("", null)
+                            ?: requireNotNull(samplesByPreset[null])
                         rawText = sample.text
                         selectedPreset = sample.preset
                     },
@@ -286,7 +285,7 @@ fun MainScreen(
             if (currentResult != null) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Detected: ${sourceTypeLabels.getValue(currentResult.detectedType)} · Removed ${currentResult.removedLineCount} lines",
+                    text = "Detected: ${labelForSourceType(currentResult.detectedType)} · Removed ${currentResult.removedLineCount} lines",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.secondary,
                 )
@@ -483,7 +482,7 @@ private fun HistorySheet(
                                     }
                                 }
                                 Text(
-                                    text = sourceTypeLabels.getValue(item.result.detectedType),
+                                    text = labelForSourceType(item.result.detectedType),
                                     style = MaterialTheme.typography.bodyMedium,
                                 )
                                 Text(
@@ -615,6 +614,12 @@ private fun shareText(context: Context, text: String) {
     }
     context.startActivity(Intent.createChooser(sendIntent, "Share cleaned text"))
 }
+
+private fun labelForSourceType(type: SourceType): String =
+    sourceTypeLabels[type] ?: type.name
+        .lowercase()
+        .split('_')
+        .joinToString(" ") { token -> token.replaceFirstChar(Char::titlecase) }
 
 private fun activeExportForTab(
     selectedTab: Int,
