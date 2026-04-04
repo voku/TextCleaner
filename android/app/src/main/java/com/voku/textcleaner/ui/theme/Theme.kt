@@ -13,6 +13,10 @@ import androidx.compose.ui.platform.LocalContext
 
 private val Indigo600 = Color(0xFF4F46E5)
 private val Indigo700 = Color(0xFF4338CA)
+internal val CodePanelBackground = Color(0xFF111827)
+internal val CodePanelBorder = Color(0xFF374151)
+internal val CodePanelTitle = Color(0xFFF9FAFB)
+internal val CodePanelContent = Color(0xFFE5E7EB)
 
 private val LightColors = lightColorScheme(
     primary = Indigo600,

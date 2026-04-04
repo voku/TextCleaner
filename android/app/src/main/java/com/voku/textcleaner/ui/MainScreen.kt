@@ -67,6 +67,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,6 +77,10 @@ import com.voku.textcleaner.core.CleanedResult
 import com.voku.textcleaner.core.Engine
 import com.voku.textcleaner.core.RawInput
 import com.voku.textcleaner.core.SourceType
+import com.voku.textcleaner.ui.theme.CodePanelBackground
+import com.voku.textcleaner.ui.theme.CodePanelBorder
+import com.voku.textcleaner.ui.theme.CodePanelContent
+import com.voku.textcleaner.ui.theme.CodePanelTitle
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.delay
@@ -107,11 +113,7 @@ private val tabTitles = listOf("Raw", "Cleaned", "Markdown", "Prompt")
 private val maxHistorySheetHeight = 420.dp
 private val appCardShape = RoundedCornerShape(24.dp)
 private val panelShape = RoundedCornerShape(18.dp)
-private val codePanelBackground = Color(0xFF111827)
-private val codePanelBorder = Color(0xFF374151)
-private val codePanelTitle = Color(0xFFF9FAFB)
-private val codePanelContent = Color(0xFFE5E7EB)
-private const val cleaningDelayMs = 200L
+private const val cleaningDebounceMs = 200L
 private const val warningCardBackgroundAlpha = 0.72f
 private const val warningCardBorderAlpha = 0.35f
 private const val mainScreenTag = "TextCleanerMainScreen"
@@ -187,7 +189,7 @@ fun MainScreen(
         if (text.isNotBlank() && !isCleaning) {
             scope.launch {
                 isCleaning = true
-                delay(cleaningDelayMs)
+                delay(cleaningDebounceMs)
                 cleanCurrentText(text)
                 isCleaning = false
             }
@@ -519,7 +521,15 @@ private fun ControlsSection(
                         Button(
                             onClick = onClean,
                             enabled = canClean,
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .semantics {
+                                    stateDescription = if (isCleaning) {
+                                        "Cleaning in progress"
+                                    } else {
+                                        "Ready to clean text"
+                                    }
+                                },
                         ) {
                             Text(if (isCleaning) "Cleaning…" else "Clean text")
                         }
@@ -568,7 +578,15 @@ private fun ControlsSection(
                         Button(
                             onClick = onClean,
                             enabled = canClean,
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .semantics {
+                                    stateDescription = if (isCleaning) {
+                                        "Cleaning in progress"
+                                    } else {
+                                        "Ready to clean text"
+                                    }
+                                },
                         ) {
                             Text(if (isCleaning) "Cleaning…" else "Clean text")
                         }
@@ -1038,7 +1056,7 @@ private fun CodeSheet(
             snippets.forEach { snippet ->
                 Card(
                     shape = panelShape,
-                    colors = CardDefaults.cardColors(containerColor = codePanelBackground),
+                    colors = CardDefaults.cardColors(containerColor = CodePanelBackground),
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),
@@ -1052,19 +1070,19 @@ private fun CodeSheet(
                             Text(
                                 text = snippet.title,
                                 style = MaterialTheme.typography.titleSmall,
-                                color = codePanelTitle,
+                                color = CodePanelTitle,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             TextButton(onClick = { onCopy(snippet.title, snippet.content) }) {
                                 Text("Copy")
                             }
                         }
-                        HorizontalDivider(color = codePanelBorder)
+                        HorizontalDivider(color = CodePanelBorder)
                         SelectionContainer {
                             Text(
                                 text = snippet.content,
                                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                                color = codePanelContent,
+                                color = CodePanelContent,
                             )
                         }
                     }
