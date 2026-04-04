@@ -35,11 +35,11 @@ All core cleanup logic has been ported with full test parity:
 - `ACTION_SEND` intent filter: system share-sheet integration
 - "Return Cleaned Text" button for `PROCESS_TEXT` callers
 
-### Milestone 4: Polish — in progress
+### Milestone 4: Polish — ✅ Complete
 
-- Performance tuning for very large texts
-- Accessibility audit
-- Play Store release preparation
+- Performance: `Engine.cleanText` runs on `Dispatchers.Default` so the UI thread is never blocked, even for very large inputs
+- Accessibility: history card items carry a `contentDescription` for TalkBack, the raw-text field has a floating label, and decorative icons inside labelled buttons use `contentDescription = null`
+- Play Store release preparation: release build type has minification and resource shrinking enabled; `versionCode` and `versionName` are set; signing is handled outside the repository (provide a keystore and configure `signingConfig` in `release`)
 
 ## Android Native Flow (PROCESS_TEXT)
 1. User selects text in Chrome or another app.

@@ -82,6 +82,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
@@ -103,8 +104,10 @@ import com.voku.textcleaner.ui.theme.WarningText
 import com.voku.textcleaner.ui.theme.WarningTitle
 import java.text.DateFormat
 import java.util.Date
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private data class PresetOption(val value: SourceType?, val label: String)
 private data class PendingExport(val text: String, val filename: String)
@@ -186,20 +189,17 @@ fun MainScreen(
         }
     }
 
-    val cleanCurrentText: (String) -> Unit = { text ->
-        if (text.isNotBlank()) {
-            val cleaned = Engine.cleanText(RawInput(rawText = text, sourceTypeHint = selectedPreset))
-            rawText = text
-            result = cleaned
-            selectedTab = 1
-            history = appendHistory(
-                context = context,
-                history = history,
-                rawText = text,
-                preset = selectedPreset,
-                result = cleaned,
-            )
-        }
+    fun applyCleanResult(text: String, cleaned: CleanedResult) {
+        rawText = text
+        result = cleaned
+        selectedTab = 1
+        history = appendHistory(
+            context = context,
+            history = history,
+            rawText = text,
+            preset = selectedPreset,
+            result = cleaned,
+        )
     }
 
     val requestClean: (String) -> Unit = { text ->
@@ -207,7 +207,10 @@ fun MainScreen(
             scope.launch {
                 isCleaning = true
                 delay(CLEANING_DEBOUNCE_MILLIS)
-                cleanCurrentText(text)
+                val cleaned = withContext(Dispatchers.Default) {
+                    Engine.cleanText(RawInput(rawText = text, sourceTypeHint = selectedPreset))
+                }
+                applyCleanResult(text, cleaned)
                 isCleaning = false
             }
         }
@@ -215,7 +218,10 @@ fun MainScreen(
 
     LaunchedEffect(initialText) {
         if (initialText.isNotBlank() && result == null) {
-            cleanCurrentText(initialText)
+            val cleaned = withContext(Dispatchers.Default) {
+                Engine.cleanText(RawInput(rawText = initialText, sourceTypeHint = selectedPreset))
+            }
+            applyCleanResult(initialText, cleaned)
         }
     }
 
@@ -471,7 +477,7 @@ private fun HeroSection(
                 onClick = onOpenGitHub,
                 modifier = Modifier.align(Alignment.End),
             ) {
-                Icon(Icons.Default.OpenInNew, contentDescription = "Opens in browser", modifier = Modifier.size(18.dp))
+                Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(6.dp))
                 Text("Contribute on GitHub")
             }
@@ -637,6 +643,7 @@ private fun RawTextPanel(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 360.dp),
+                label = { Text("Raw text") },
                 placeholder = { Text("Paste noisy text here…") },
                 textStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 colors = inputFieldColors(),
@@ -941,9 +948,19 @@ private fun HistorySheet(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(history, key = { it.id }) { item ->
+                        val itemDate = DateFormat.getDateTimeInstance(
+                            DateFormat.MEDIUM,
+                            DateFormat.SHORT,
+                        ).format(Date(item.timestamp))
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .semantics {
+                                    val lineCount = item.result.removedLineCount
+                                    val lineWord = if (lineCount == 1) "line" else "lines"
+                                    contentDescription = "${labelForSourceType(item.result.detectedType)}, $itemDate. " +
+                                        "Removed $lineCount $lineWord. Tap to restore."
+                                }
                                 .clickable { onRestore(item) },
                             shape = panelShape,
                             colors = CardDefaults.cardColors(
@@ -961,10 +978,7 @@ private fun HistorySheet(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Text(
-                                        text = DateFormat.getDateTimeInstance(
-                                            DateFormat.MEDIUM,
-                                            DateFormat.SHORT,
-                                        ).format(Date(item.timestamp)),
+                                        text = itemDate,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.secondary,
                                     )

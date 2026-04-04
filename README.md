@@ -141,17 +141,14 @@ The release is updated automatically on every push to `main`.
 
 ## Roadmap
 
-### Now
+### Done
 
 - Polish the web app
 - Improve cleanup quality for real copied content
 - Ship and maintain the GitHub Pages deployment
-- Android native app
-
-### Later
-
+- Android native app (Kotlin + Jetpack Compose)
 - Kotlin rewrite / port of the full cleanup engine
-- Native share-target flow for Android
+- Native share-target flow for Android (`ACTION_SEND` and `PROCESS_TEXT` intent filters)
 
 ## Contributing
 
