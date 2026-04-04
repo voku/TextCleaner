@@ -76,6 +76,11 @@ The Jetpack Compose UI in `ui/MainScreen.kt` mirrors the web app's tab layout:
 - **History sheet**: persistent restore/delete/clear flow for recent cleanups
 - **Cleanup logic sheet**: bundled source viewer for the native cleanup engine and rules
 
+## Android validation
+
+- CI-aligned verification: `cd android && ./gradlew testCiUnitTest assembleCi`
+- Installable CI APK output: `android/app/build/outputs/apk/ci/app-ci.apk`
+
 ## Project Structure
 
 ```
