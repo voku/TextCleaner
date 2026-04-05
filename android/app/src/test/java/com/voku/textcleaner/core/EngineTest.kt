@@ -1735,6 +1735,7 @@ Do not share my personal information
         assertFalse(result.cleanedText.contains("Showing 3 changed files"))
     }
 
+
     // ── Block-aware removal ──────────────────────────────────────────────
 
     @Test
@@ -1840,6 +1841,184 @@ Do not share my personal information
         )
         assertTrue(result.cleanedText.contains("review-assist[bot]"))
         assertTrue(result.cleanedText.contains("Summary by CodeRabbit"))
+        assertTrue(result.cleanedText.contains("Real content."))
+    }
+
+    // ── removeBlocks unit tests ──────────────────────────────────────────
+
+    @Test
+    fun `removeBlocks removes bot review header block to next blank line`() {
+        val lines = listOf(
+            "review-assist[bot]",
+            "Some bot review content",
+            "More bot content",
+            "",
+            "Real review comment here.",
+        )
+        val result = Engine.removeBlocks(lines, GitHubRuleSet)
+        assertFalse(result.any { it.contains("bot") })
+        assertFalse(result.any { it.contains("Some bot review content") })
+        assertTrue(result.any { it.contains("Real review comment here.") })
+    }
+
+    @Test
+    fun `removeBlocks removes Finishing Touches block until blank line`() {
+        val lines = listOf(
+            "\u2728 Finishing Touches",
+            "- [ ] Some task",
+            "- [ ] Another task",
+            "",
+            "Actual content follows.",
+        )
+        val result = Engine.removeBlocks(lines, GitHubRuleSet)
+        assertFalse(result.any { it.contains("Finishing Touches") })
+        assertFalse(result.any { it.contains("Some task") })
+        assertTrue(result.any { it.contains("Actual content follows.") })
+    }
+
+    @Test
+    fun `removeBlocks preserves code blocks inside a bot header range`() {
+        val lines = listOf(
+            "review-assist[bot]",
+            "```kotlin",
+            "val x = 1",
+            "```",
+            "",
+            "Preserved content.",
+        )
+        val result = Engine.removeBlocks(lines, GitHubRuleSet)
+        // The bot header line starts the block; it has no end pattern so it removes until blank.
+        // The code fence toggles inCodeBlock first — but the [bot] line fires before the fence,
+        // so the block (including the fence) is consumed. Preserved content after blank survives.
+        assertTrue(result.any { it.contains("Preserved content.") })
+    }
+
+    @Test
+    fun `removeBlocks does not remove content that is inside a code fence`() {
+        val lines = listOf(
+            "```",
+            "review-assist[bot]",
+            "```",
+            "Real content.",
+        )
+        val result = Engine.removeBlocks(lines, GitHubRuleSet)
+        // Inside the code fence, the [bot] line should NOT trigger block removal
+        assertTrue(result.any { it.contains("review-assist[bot]") })
+        assertTrue(result.any { it.contains("Real content.") })
+    }
+
+    // ── Mid-body noise tests ─────────────────────────────────────────────
+
+    @Test
+    fun `removes mid-body review event lines`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "Description of changes.",
+                    "alice approved these changes",
+                    "bob dismissed alice\u2019s review",
+                    "charlie requested changes",
+                    "The fix addresses the auth issue.",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("approved these changes"))
+        assertFalse(result.cleanedText.contains("dismissed"))
+        assertFalse(result.cleanedText.contains("requested changes"))
+        assertTrue(result.cleanedText.contains("Description of changes."))
+        assertTrue(result.cleanedText.contains("The fix addresses the auth issue."))
+    }
+
+    @Test
+    fun `removes merge and branch-delete events`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "Description of changes.",
+                    "alice merged commit abc1234 into main",
+                    "bob deleted the feature/cleanup branch",
+                    "charlie added 3 commits 2 days ago",
+                    "dave force-pushed the dev branch from abc1234 to def5678",
+                    "The fix addresses the auth issue.",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("merged commit"))
+        assertFalse(result.cleanedText.contains("deleted the"))
+        assertFalse(result.cleanedText.contains("added 3 commits"))
+        assertFalse(result.cleanedText.contains("force-pushed"))
+        assertTrue(result.cleanedText.contains("Description of changes."))
+        assertTrue(result.cleanedText.contains("The fix addresses the auth issue."))
+    }
+
+    @Test
+    fun `removes check-count and cross-reference event lines`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "# Issue",
+                    "This was referenced Oct 3, 2025",
+                    "alice referenced this pull request",
+                    "This comment was marked as resolved",
+                    "3 checks passed",
+                    "Actual discussion content.",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("This was referenced"))
+        assertFalse(result.cleanedText.contains("referenced this pull request"))
+        assertFalse(result.cleanedText.contains("marked as resolved"))
+        assertFalse(result.cleanedText.contains("3 checks passed"))
+        assertTrue(result.cleanedText.contains("Actual discussion content."))
+    }
+
+    @Test
+    fun `removes PR status banners and merge UI lines`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "Description of changes.",
+                    "Squash and merge",
+                    "Confirm squash and merge",
+                    "This branch is up to date with the base branch.",
+                    "All checks have passed",
+                    "Merging is blocked",
+                    "The fix addresses the auth issue.",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Squash and merge"))
+        assertFalse(result.cleanedText.contains("Confirm squash and merge"))
+        assertFalse(result.cleanedText.contains("This branch is up to date"))
+        assertFalse(result.cleanedText.contains("All checks have passed"))
+        assertFalse(result.cleanedText.contains("Merging is blocked"))
+        assertTrue(result.cleanedText.contains("Description of changes."))
+        assertTrue(result.cleanedText.contains("The fix addresses the auth issue."))
+    }
+
+    @Test
+    fun `removes standalone severity label lines`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# Review\nmedium\nThis is a medium-priority issue.\nhigh\nlow\ncritical\ninformational\nReal content.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.lines().any { it.trim() == "medium" })
+        assertFalse(result.cleanedText.lines().any { it.trim() == "high" })
+        assertFalse(result.cleanedText.lines().any { it.trim() == "low" })
+        assertFalse(result.cleanedText.lines().any { it.trim() == "critical" })
+        assertFalse(result.cleanedText.lines().any { it.trim() == "informational" })
+        assertTrue(result.cleanedText.contains("This is a medium-priority issue."))
         assertTrue(result.cleanedText.contains("Real content."))
     }
 

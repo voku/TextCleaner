@@ -103,11 +103,13 @@ object Engine {
 
     /**
      * Remove structural blocks identified by start/end marker patterns.
-     * Mirrors `removeBlocks` in `src/core/engine.ts`.
+     * Enables removing multi-line sections (e.g. CodeRabbit review tables,
+     * bot review sections) that individual line matching cannot catch.
+     * Port of `removeBlocks()` in `src/core/engine.ts`.
      */
     fun removeBlocks(lines: List<String>, ruleSet: CleanupRuleSet): List<String> {
         val patterns = ruleSet.blockPatterns
-        if (patterns.isNullOrEmpty()) return lines
+        if (patterns.isEmpty()) return lines
 
         val result = mutableListOf<String>()
         var inCodeBlock = false
@@ -136,7 +138,7 @@ object Engine {
                 if (bp.start.containsMatchIn(trimmed)) {
                     val maxLen = bp.maxLines
                     if (bp.end != null) {
-                        // Scan forward for the end marker
+                        // Scan forward for the end pattern
                         var j = i + 1
                         var found = false
                         while (j < lines.size && (j - i) < maxLen) {
@@ -158,7 +160,7 @@ object Engine {
                         while (j < lines.size && (j - i) < maxLen && lines[j].trim().isNotEmpty()) {
                             j++
                         }
-                        i = j // skip block (blank line itself kept on next iteration)
+                        i = j // skip block (blank line itself will be kept on next iteration)
                         matched = true
                     }
                     break
