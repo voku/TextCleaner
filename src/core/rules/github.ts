@@ -135,8 +135,6 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Summary by CodeRabbit',
     'Sequence Diagram(s)',
     'Poem',
-    'Some comments are outside the diff and can\'t be posted inline due to platform limitations.',
-    'Some comments are outside the diff and can\u2019t be posted inline due to platform limitations.',
     'CodeRabbit',
     'Release Notes',
     // Discovered via analysis of GitHub Issue, Repo, and Files Changed pages
@@ -228,7 +226,7 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^@.+Reply\.\.\.$/i,                          // tab-less "Reply..." button variant
     /^P[0-9] Badge .+/i,                          // Codex/review priority badge lines
     /^@[a-zA-Z0-9][a-zA-Z0-9._-]*$/i,            // standalone @handle lines (nav chrome)
-    /^[a-f0-9]{7,40}$/,                           // short and full commit SHAs
+    /^[a-f0-9]{7}$|^[a-f0-9]{40}$/,              // short (7) and full (40) commit SHAs only
     // Discovered via analysis of GitHub Issue, Repo, and Files Changed pages
     /^Used by \d+( users?)?$/i,                   // GitHub repo sidebar stat
     /^\d+ contributors?$/i,                       // GitHub repo contributors count
@@ -238,7 +236,8 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^Showing \d+ changed files? with \d+ additions? and \d+ deletions?\.$/i, // diff summary
     /^\u00B7\s+\d+ comments?$/i,                  // "· N comments" middle-dot separator (U+00B7)
     /^\u00B7$/,                                    // standalone middle-dot separator
-    /^.* changed the title .*$/i,                 // GitHub issue title-change event
+    /^[a-zA-Z0-9][a-zA-Z0-9._-]* changed the title .*$/i, // GitHub issue title-change event (username prefix required)
+    /^Some comments are outside the diff and can[''\u2019]t be posted inline due to platform limitations\.$/i, // platform note (both apostrophe variants)
     /^yesterday$/i,                               // relative timestamp not covered by existing rule
     /^last (week|month|year)$/i,                  // relative timestamp
     /^(a|an) (minute|hour|day|week|month|year) ago$/i, // singular relative timestamp
