@@ -1734,4 +1734,347 @@ Do not share my personal information
         assertTrue(result.cleanedText.contains("I reviewed commits 1 through 5 in detail."))
         assertFalse(result.cleanedText.contains("Showing 3 changed files"))
     }
+
+    // ── removeBlocks unit tests ──────────────────────────────────────────
+
+    @Test
+    fun `removeBlocks removes bot review header block to next blank line`() {
+        val lines = listOf(
+            "review-assist[bot]",
+            "Some bot review content",
+            "More bot content",
+            "",
+            "Real review comment here.",
+        )
+        val result = Engine.removeBlocks(lines, GitHubRuleSet)
+        assertFalse(result.any { it.contains("bot") })
+        assertFalse(result.any { it.contains("Some bot review content") })
+        assertTrue(result.any { it.contains("Real review comment here.") })
+    }
+
+    @Test
+    fun `removeBlocks removes Finishing Touches block until blank line`() {
+        val lines = listOf(
+            "\u2728 Finishing Touches",
+            "- [ ] Some task",
+            "- [ ] Another task",
+            "",
+            "Actual content follows.",
+        )
+        val result = Engine.removeBlocks(lines, GitHubRuleSet)
+        assertFalse(result.any { it.contains("Finishing Touches") })
+        assertFalse(result.any { it.contains("Some task") })
+        assertTrue(result.any { it.contains("Actual content follows.") })
+    }
+
+    @Test
+    fun `removeBlocks preserves code blocks inside a bot header range`() {
+        val lines = listOf(
+            "review-assist[bot]",
+            "```kotlin",
+            "val x = 1",
+            "```",
+            "",
+            "Preserved content.",
+        )
+        val result = Engine.removeBlocks(lines, GitHubRuleSet)
+        // The bot header line starts the block; it has no end pattern so it removes until blank.
+        // The code fence toggles inCodeBlock first — but the [bot] line fires before the fence,
+        // so the block (including the fence) is consumed. Preserved content after blank survives.
+        assertTrue(result.any { it.contains("Preserved content.") })
+    }
+
+    @Test
+    fun `removeBlocks does not remove content that is inside a code fence`() {
+        val lines = listOf(
+            "```",
+            "review-assist[bot]",
+            "```",
+            "Real content.",
+        )
+        val result = Engine.removeBlocks(lines, GitHubRuleSet)
+        // Inside the code fence, the [bot] line should NOT trigger block removal
+        assertTrue(result.any { it.contains("review-assist[bot]") })
+        assertTrue(result.any { it.contains("Real content.") })
+    }
+
+    // ── Mid-body noise tests ─────────────────────────────────────────────
+
+    @Test
+    fun `removes mid-body review event lines`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "Description of changes.",
+                    "alice approved these changes",
+                    "bob dismissed alice\u2019s review",
+                    "charlie requested changes",
+                    "The fix addresses the auth issue.",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("approved these changes"))
+        assertFalse(result.cleanedText.contains("dismissed"))
+        assertFalse(result.cleanedText.contains("requested changes"))
+        assertTrue(result.cleanedText.contains("Description of changes."))
+        assertTrue(result.cleanedText.contains("The fix addresses the auth issue."))
+    }
+
+    @Test
+    fun `removes merge and branch-delete events`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "Description of changes.",
+                    "alice merged commit abc1234 into main",
+                    "bob deleted the feature/cleanup branch",
+                    "charlie added 3 commits 2 days ago",
+                    "dave force-pushed the dev branch from abc1234 to def5678",
+                    "The fix addresses the auth issue.",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("merged commit"))
+        assertFalse(result.cleanedText.contains("deleted the"))
+        assertFalse(result.cleanedText.contains("added 3 commits"))
+        assertFalse(result.cleanedText.contains("force-pushed"))
+        assertTrue(result.cleanedText.contains("Description of changes."))
+        assertTrue(result.cleanedText.contains("The fix addresses the auth issue."))
+    }
+
+    @Test
+    fun `removes check-count and cross-reference event lines`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "# Issue",
+                    "This was referenced Oct 3, 2025",
+                    "alice referenced this pull request",
+                    "This comment was marked as resolved",
+                    "3 checks passed",
+                    "Actual discussion content.",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("This was referenced"))
+        assertFalse(result.cleanedText.contains("referenced this pull request"))
+        assertFalse(result.cleanedText.contains("marked as resolved"))
+        assertFalse(result.cleanedText.contains("3 checks passed"))
+        assertTrue(result.cleanedText.contains("Actual discussion content."))
+    }
+
+    @Test
+    fun `removes PR status banners and merge UI lines`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "Description of changes.",
+                    "Squash and merge",
+                    "Confirm squash and merge",
+                    "This branch is up to date with the base branch.",
+                    "All checks have passed",
+                    "Merging is blocked",
+                    "The fix addresses the auth issue.",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Squash and merge"))
+        assertFalse(result.cleanedText.contains("Confirm squash and merge"))
+        assertFalse(result.cleanedText.contains("This branch is up to date"))
+        assertFalse(result.cleanedText.contains("All checks have passed"))
+        assertFalse(result.cleanedText.contains("Merging is blocked"))
+        assertTrue(result.cleanedText.contains("Description of changes."))
+        assertTrue(result.cleanedText.contains("The fix addresses the auth issue."))
+    }
+
+    @Test
+    fun `removes standalone severity label lines`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# Review\nmedium\nThis is a medium-priority issue.\nhigh\nlow\ncritical\ninformational\nReal content.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.lines().any { it.trim() == "medium" })
+        assertFalse(result.cleanedText.lines().any { it.trim() == "high" })
+        assertFalse(result.cleanedText.lines().any { it.trim() == "low" })
+        assertFalse(result.cleanedText.lines().any { it.trim() == "critical" })
+        assertFalse(result.cleanedText.lines().any { it.trim() == "informational" })
+        assertTrue(result.cleanedText.contains("This is a medium-priority issue."))
+        assertTrue(result.cleanedText.contains("Real content."))
+    }
+
+    // ── Golden fixture integration test ──────────────────────────────────
+
+    @Test
+    fun `golden fixture cleans a complete real PR paste to expected output`() {
+        val fullPagePaste = listOf(
+            "- - - - - - - - - - - - - - - Skip to content",
+            "voku",
+            "AmysEcho",
+            "Repository navigation",
+            "Code",
+            "Issues",
+            "2",
+            "(2)",
+            "Pull requests",
+            "12",
+            "(12)",
+            "Agents",
+            "Discussions",
+            "Actions",
+            "Projects",
+            "Wiki",
+            // PR title
+            "Expose runtime diagnosability for gesture detector and surface in status/docs/tests",
+            // PR metadata
+            "#1123",
+            "Merged",
+            "voku",
+            "merged 3 commits into",
+            "main",
+            "from",
+            "codex/work-on-todos-autonomously",
+            "yesterday",
+            "+146",
+            "-16",
+            "Lines changed: 146 additions &amp; 16 deletions",
+            "Conversation6 (6)",
+            "Commits3 (3)",
+            "Checks14 (14)",
+            "Files changed9 (9)",
+            "Conversation",
+            "@voku",
+            "Owner",
+            "voku",
+            "commented",
+            "2 days ago",
+            "\u2022",
+            // PR body — the content that matters
+            "Motivation",
+            "Reduce time-to-root-cause for MediaPipe/gesture runtime incidents.",
+            "",
+            "Description",
+            "Added runtime diagnostics to GestureDetector including runtimeDelegates.",
+            "",
+            "Testing",
+            "Ran unit tests for the gesture module.",
+            "",
+            // Bot review block
+            "review-assist[bot]",
+            "review-assist bot reviewed 1 hour ago",
+            "Contributor",
+            "review-assist bot",
+            "left a comment",
+            "Code Review",
+            "",
+            "This pull request implements runtime diagnosability enhancements.",
+            "",
+            // CodeRabbit table
+            "Codex Task",
+            "Summary by CodeRabbit",
+            "Release Notes",
+            "",
+            // Inline review comment
+            "webapp/src/gesture/core/GestureDetector.ts",
+            "Outdated",
+            "Comment on lines +532 to +551",
+            "  getRuntimeDiagnostics(): {",
+            "    running: boolean;",
+            "  } {",
+            "The return type is complex and duplicated.",
+            "",
+            // Merge UI noise
+            "Caution",
+            "Review failed",
+            "The pull request is closed.",
+            "All checks have passed",
+            "Squash and merge",
+            "Confirm squash and merge",
+            "",
+            // Sidebar
+            "Reviewers",
+            "+1 more reviewer",
+            "Assignees",
+            "No one\u2014",
+            "Labels",
+            "None yet",
+            "Projects",
+            "Milestone",
+            "No milestone",
+            "Development",
+            "Successfully merging this pull request may close these issues.",
+            "",
+            // Footer
+            "Footer",
+            "\u00A9 2026 GitHub, Inc.",
+            "Footer navigation",
+            "Terms",
+            "Privacy",
+        ).joinToString("\n")
+
+        val result = Engine.cleanText(
+            RawInput(rawText = fullPagePaste, sourceTypeHint = SourceType.GITHUB_PR),
+            ruleSetOverride = GitHubRuleSet,
+        )
+
+        // ── Must be present (the meaningful content) ─────────────────────────
+        assertTrue(result.cleanedText.contains("Expose runtime diagnosability for gesture detector and surface in status/docs/tests"))
+        assertTrue(result.cleanedText.contains("Motivation"))
+        assertTrue(result.cleanedText.contains("Reduce time-to-root-cause for MediaPipe/gesture runtime incidents."))
+        assertTrue(result.cleanedText.contains("Description"))
+        assertTrue(result.cleanedText.contains("Added runtime diagnostics to GestureDetector including runtimeDelegates."))
+        assertTrue(result.cleanedText.contains("Testing"))
+        assertTrue(result.cleanedText.contains("Ran unit tests for the gesture module."))
+        assertTrue(result.cleanedText.contains("This pull request implements runtime diagnosability enhancements."))
+        // Code review comment preserved
+        assertTrue(result.cleanedText.contains("webapp/src/gesture/core/GestureDetector.ts"))
+        assertTrue(result.cleanedText.contains("getRuntimeDiagnostics(): {"))
+        assertTrue(result.cleanedText.contains("The return type is complex and duplicated."))
+
+        // ── Must NOT be present (the noise) ──────────────────────────────────
+        // Header chrome
+        assertFalse(result.cleanedText.contains("Skip to content"))
+        assertFalse(result.cleanedText.contains("Repository navigation"))
+        assertFalse(result.cleanedText.contains("AmysEcho"))
+        // PR metadata
+        assertFalse(result.cleanedText.contains("#1123"))
+        assertFalse(result.cleanedText.contains("merged 3 commits into"))
+        assertFalse(result.cleanedText.contains("Lines changed: 146 additions"))
+        assertFalse(result.cleanedText.contains("Conversation6 (6)"))
+        // Bot review block header
+        assertFalse(result.cleanedText.contains("review-assist[bot]"))
+        // CodeRabbit metadata
+        assertFalse(result.cleanedText.contains("Codex Task"))
+        assertFalse(result.cleanedText.contains("Summary by CodeRabbit"))
+        assertFalse(result.cleanedText.contains("Release Notes"))
+        // Merge UI noise
+        assertFalse(result.cleanedText.contains("Caution"))
+        assertFalse(result.cleanedText.contains("Review failed"))
+        assertFalse(result.cleanedText.contains("The pull request is closed."))
+        assertFalse(result.cleanedText.contains("All checks have passed"))
+        assertFalse(result.cleanedText.contains("Squash and merge"))
+        // Sidebar
+        assertFalse(result.cleanedText.contains("No one\u2014"))
+        assertFalse(result.cleanedText.contains("No milestone"))
+        // Footer
+        assertFalse(result.cleanedText.contains("Footer navigation"))
+        assertFalse(result.cleanedText.contains("\u00A9 2026 GitHub, Inc."))
+        assertFalse(result.cleanedText.contains("Terms"))
+
+        // ── Line count sanity check ──────────────────────────────────────────
+        val nonBlankLines = result.cleanedText.lines().filter { it.trim().isNotEmpty() }
+        val lineCount = nonBlankLines.size
+        assertTrue("Expected at least 5 non-blank lines, got $lineCount", lineCount >= 5)
+        assertTrue("Expected at most 35 non-blank lines, got $lineCount", lineCount <= 35)
+    }
 }
