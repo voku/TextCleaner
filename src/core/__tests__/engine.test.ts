@@ -1993,6 +1993,62 @@ Privacy`;
     expect(result.cleanedText).toContain('The actual content.');
   });
 
+  it('removes "receiving notifications because you modified the open/close state" suffix variant', () => {
+    const result = cleanText({
+      rawText: [
+        'Description',
+        'The actual content.',
+        "You\u2019re receiving notifications because you modified the open/close state.",
+        'Unsubscribe',
+        'Footer',
+        '\u00A9 2026 GitHub, Inc.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('modified the open/close state');
+    expect(result.cleanedText).not.toContain('Unsubscribe');
+    expect(result.cleanedText).toContain('The actual content.');
+  });
+
+  it('removes "No one—assign yourself" (FFFC-stripped sidebar line) from suffix', () => {
+    const result = cleanText({
+      rawText: [
+        'Description',
+        'The actual content.',
+        'Reviewers',
+        'Assignees',
+        'No one\u2014assign yourself',
+        'Labels',
+        'None yet',
+        'Footer',
+        '\u00A9 2026 GitHub, Inc.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('No one\u2014assign yourself');
+    expect(result.cleanedText).not.toContain('Reviewers');
+    expect(result.cleanedText).toContain('The actual content.');
+  });
+
+  it('removes "Paste, drop, or click to add files" comment-box footer line', () => {
+    const result = cleanText({
+      rawText: [
+        'Description',
+        'The actual content.',
+        'Add a comment',
+        'Add your comment here...',
+        'Paste, drop, or click to add files',
+        'Comment',
+        'Footer',
+        '\u00A9 2026 GitHub, Inc.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Paste, drop, or click to add files');
+    expect(result.cleanedText).not.toContain('Add a comment');
+    expect(result.cleanedText).toContain('The actual content.');
+  });
+
   // ── Golden fixture integration test ─────────────────────────────────────
   // This is the "single most uncomfortable test" from the blind-spot analysis:
   // a real full-page PR paste, cleaned and compared to a known-good output.

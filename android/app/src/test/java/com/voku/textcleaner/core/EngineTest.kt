@@ -2131,6 +2131,74 @@ Do not share my personal information
         assertTrue(result.cleanedText.contains("The actual content."))
     }
 
+    @Test
+    fun `removes receiving notifications because you modified the open close state suffix variant`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "Description",
+                    "The actual content.",
+                    "You\u2019re receiving notifications because you modified the open/close state.",
+                    "Unsubscribe",
+                    "Footer",
+                    "\u00A9 2026 GitHub, Inc.",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("modified the open/close state"))
+        assertFalse(result.cleanedText.contains("Unsubscribe"))
+        assertTrue(result.cleanedText.contains("The actual content."))
+    }
+
+    @Test
+    fun `removes No one em-dash assign yourself FFFC-stripped sidebar line from suffix`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "Description",
+                    "The actual content.",
+                    "Reviewers",
+                    "Assignees",
+                    "No one\u2014assign yourself",
+                    "Labels",
+                    "None yet",
+                    "Footer",
+                    "\u00A9 2026 GitHub, Inc.",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("No one\u2014assign yourself"))
+        assertFalse(result.cleanedText.contains("Reviewers"))
+        assertTrue(result.cleanedText.contains("The actual content."))
+    }
+
+    @Test
+    fun `removes Paste drop or click to add files comment-box footer line`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "Description",
+                    "The actual content.",
+                    "Add a comment",
+                    "Add your comment here...",
+                    "Paste, drop, or click to add files",
+                    "Comment",
+                    "Footer",
+                    "\u00A9 2026 GitHub, Inc.",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Paste, drop, or click to add files"))
+        assertFalse(result.cleanedText.contains("Add a comment"))
+        assertTrue(result.cleanedText.contains("The actual content."))
+    }
+
     // ── Golden fixture integration test ─────────────────────────────────
     // Mirrors the TypeScript golden fixture at engine.test.ts:1815+
 
