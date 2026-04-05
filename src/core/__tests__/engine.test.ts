@@ -2334,8 +2334,9 @@ describe('GitHub PR — demo file patterns', () => {
   });
 
   it('removes European thousands-separator change counts (e.g. +1.234)', () => {
-    // Note: positive-only tested here; negative values like -6.106 are protected by
-    // the filename preserve-regex (/^[a-zA-Z0-9_.-]+\.[a-zA-Z0-9]+$/ matches "-6.106").
+    // Positive values work fine. Negative values like -6.106 are protected by the
+    // filename preserve-regex: [a-zA-Z0-9_.-] includes '-' as a literal char at
+    // the end of the class, so '-6.106' is treated as a filename and preserved.
     const result = cleanText({
       rawText: 'PR title.\n+1.234\nContent.',
       sourceTypeHint: 'github_pr',
