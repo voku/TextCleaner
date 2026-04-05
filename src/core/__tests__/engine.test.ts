@@ -1535,6 +1535,105 @@ describe('GitHub — Research-Driven Pattern Coverage', () => {
     expect(result.cleanedText).toContain('Some content');
   });
 
+  it('removes over-dashed "Skip to content" prefix while preserving the PR title', () => {
+    const result = cleanText({
+      rawText: '- - - - - - - - - - - - - - - Skip to content\nvoku\nAmysEcho\nRepository navigation\nCode\nIssues\n12\n(12)\nExpose runtime diagnosability for gesture detector and surface in status/docs/tests',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).toBe('Expose runtime diagnosability for gesture detector and surface in status/docs/tests');
+  });
+
+  it('removes standalone PR header metadata lines from a copied PR page', () => {
+    const result = cleanText({
+      rawText: '#1123\nMerged\nmerged 3 commits into\nmain\nfrom\ncodex/work-on-todos-autonomously\nLines changed: 146 additions &amp; 16 deletions\nSome content',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('#1123');
+    expect(result.cleanedText).not.toContain('Merged');
+    expect(result.cleanedText).not.toContain('merged 3 commits into');
+    expect(result.cleanedText).not.toContain('Lines changed: 146 additions');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('keeps valuable PR body and review details from the raw GitHub sample while dropping obvious chrome', () => {
+    const rawText = `- - - - - - - - - - - - - - - Skip to content
+voku
+AmysEcho
+Repository navigation
+Code
+Issues
+2
+(2)
+Pull requests
+12
+(12)
+Agents
+Discussions
+Actions
+Projects
+Wiki
+Expose runtime diagnosability for gesture detector and surface in status/docs/tests
+#1123
+Merged
+voku
+merged 3 commits into
+main
+from
+codex/work-on-todos-autonomously
+yesterday
++146
+-16
+Lines changed: 146 additions &amp; 16 deletions
+Conversation6 (6)
+Commits3 (3)
+Checks14 (14)
+Files changed9 (9)
+Conversation
+@voku
+Owner
+voku
+commented
+2 days ago
+•
+Motivation
+Reduce time-to-root-cause for MediaPipe/gesture runtime incidents by surfacing backend delegate, module readiness, model URLs, and initialization errors in a single diagnostic snapshot.
+Description
+Added runtime diagnostics to GestureDetector including runtimeDelegates, lastInitializationError, and a new method getRuntimeDiagnostics() that returns delegates, module readiness flags, model URLs, frame count, running state, and last init error.
+Testing
+Ran unit tests for the gesture module (Vitest) including GestureDetector and GestureRecognitionOrchestrator test suites; the updated tests asserting delegate reporting, CPU fallback, last initialization error, and status exposure passed.
+webapp/src/gesture/core/GestureDetector.ts
+Outdated
+Comment on lines +532 to +551
+  getRuntimeDiagnostics(): {
+    running: boolean;
+  } {
+The return type for getRuntimeDiagnostics is complex and duplicated from the internal runtimeDelegates field definition.
+Footer
+© 2026 GitHub, Inc.
+Footer navigation
+Terms
+Privacy`;
+
+    const result = cleanText({
+      rawText,
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+
+    expect(result.cleanedText).not.toContain('Skip to content');
+    expect(result.cleanedText).not.toContain('Repository navigation');
+    expect(result.cleanedText).not.toContain('#1123');
+    expect(result.cleanedText).not.toContain('Merged');
+    expect(result.cleanedText).not.toContain('merged 3 commits into');
+    expect(result.cleanedText).not.toContain('Footer navigation');
+
+    expect(result.cleanedText).toContain('Expose runtime diagnosability for gesture detector and surface in status/docs/tests');
+    expect(result.cleanedText).toContain('Motivation');
+    expect(result.cleanedText).toContain('Description');
+    expect(result.cleanedText).toContain('Testing');
+    expect(result.cleanedText).toContain('getRuntimeDiagnostics(): {');
+    expect(result.cleanedText).toContain('The return type for getRuntimeDiagnostics is complex and duplicated');
+  });
+
   // ── Preservation guards (no false positives) ───────────────────────────
 
   it('preserves real diff content even when it looks like a stat line', () => {

@@ -71,7 +71,7 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'commented',
   ],
   prefixRegexes: [
-    /^(?:- - - )?Skip to content$/i,
+    /^[- ]*Skip to content$/i,
     /^Search or jump to\.\.\.$/i,
     /^\d+$/i,
     /^\(\d+\)$/i,
@@ -128,6 +128,8 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Copilot uses AI. Check for mistakes.',
     'Mention @copilot in a comment to make changes to this pull request.',
     'Read all affected files',
+    'Merged',
+    'Outdated',
     // Discovered via static analysis of real PR samples
     'Conversation',
     'Conversations',
@@ -202,7 +204,9 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^Commits\d+ \(\d+\)$/i,
     /^Checks\d+ \(\d+\)$/i,
     /^Files changed\d+ \(\d+\)$/i,
-    /^Lines changed: \d+ additions & \d+ deletions$/i,
+    /^Lines changed: \d+ additions (?:&|&amp;) \d+ deletions$/i,
+    /^#\d+$/i,
+    /^merged \d+ commits? into$/i,
     /^wants to merge \d+ commits? into$/i,
     /^.* wants to merge \d+ commits? into .*$/i,
     /^Reviewed commit: [a-f0-9]+$/i,
@@ -226,7 +230,7 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^@.+Reply\.\.\.$/i,                          // tab-less "Reply..." button variant
     /^P[0-9] Badge .+/i,                          // Codex/review priority badge lines
     /^@[a-zA-Z0-9][a-zA-Z0-9._-]*$/i,            // standalone @handle lines (nav chrome)
-    /^[a-f0-9]{7}$|^[a-f0-9]{40}$/,              // short (7) and full (40) commit SHAs only
+    /^(?:[a-f0-9]{7}|[a-f0-9]{40})$/,           // short (7) and full (40) commit SHAs only
     // Discovered via analysis of GitHub Issue, Repo, and Files Changed pages
     /^Used by \d+( users?)?$/i,                   // GitHub repo sidebar stat
     /^\d+ contributors?$/i,                       // GitHub repo contributors count

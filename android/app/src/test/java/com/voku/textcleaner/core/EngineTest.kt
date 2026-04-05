@@ -1614,6 +1614,117 @@ Do not share my personal information
     }
 
     @Test
+    fun `removes over-dashed Skip to content prefix while preserving PR title`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "- - - - - - - - - - - - - - - Skip to content\nvoku\nAmysEcho\nRepository navigation\nCode\nIssues\n12\n(12)\nExpose runtime diagnosability for gesture detector and surface in status/docs/tests",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertEquals("Expose runtime diagnosability for gesture detector and surface in status/docs/tests", result.cleanedText)
+    }
+
+    @Test
+    fun `removes standalone PR header metadata lines from copied PR page`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "#1123\nMerged\nmerged 3 commits into\nmain\nfrom\ncodex/work-on-todos-autonomously\nLines changed: 146 additions &amp; 16 deletions\nSome content",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("#1123"))
+        assertFalse(result.cleanedText.contains("Merged"))
+        assertFalse(result.cleanedText.contains("merged 3 commits into"))
+        assertFalse(result.cleanedText.contains("Lines changed: 146 additions"))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `keeps valuable PR body and review details from raw GitHub sample while dropping obvious chrome`() {
+        val rawText =
+            """
+            - - - - - - - - - - - - - - - Skip to content
+            voku
+            AmysEcho
+            Repository navigation
+            Code
+            Issues
+            2
+            (2)
+            Pull requests
+            12
+            (12)
+            Agents
+            Discussions
+            Actions
+            Projects
+            Wiki
+            Expose runtime diagnosability for gesture detector and surface in status/docs/tests
+            #1123
+            Merged
+            voku
+            merged 3 commits into
+            main
+            from
+            codex/work-on-todos-autonomously
+            yesterday
+            +146
+            -16
+            Lines changed: 146 additions &amp; 16 deletions
+            Conversation6 (6)
+            Commits3 (3)
+            Checks14 (14)
+            Files changed9 (9)
+            Conversation
+            @voku
+            Owner
+            voku
+            commented
+            2 days ago
+            •
+            Motivation
+            Reduce time-to-root-cause for MediaPipe/gesture runtime incidents by surfacing backend delegate, module readiness, model URLs, and initialization errors in a single diagnostic snapshot.
+            Description
+            Added runtime diagnostics to GestureDetector including runtimeDelegates, lastInitializationError, and a new method getRuntimeDiagnostics() that returns delegates, module readiness flags, model URLs, frame count, running state, and last init error.
+            Testing
+            Ran unit tests for the gesture module (Vitest) including GestureDetector and GestureRecognitionOrchestrator test suites; the updated tests asserting delegate reporting, CPU fallback, last initialization error, and status exposure passed.
+            webapp/src/gesture/core/GestureDetector.ts
+            Outdated
+            Comment on lines +532 to +551
+              getRuntimeDiagnostics(): {
+                running: boolean;
+              } {
+            The return type for getRuntimeDiagnostics is complex and duplicated from the internal runtimeDelegates field definition.
+            Footer
+            © 2026 GitHub, Inc.
+            Footer navigation
+            Terms
+            Privacy
+            """.trimIndent()
+
+        val result = Engine.cleanText(
+            RawInput(rawText = rawText, sourceTypeHint = SourceType.GITHUB_PR),
+            ruleSetOverride = GitHubRuleSet,
+        )
+
+        assertFalse(result.cleanedText.contains("Skip to content"))
+        assertFalse(result.cleanedText.contains("Repository navigation"))
+        assertFalse(result.cleanedText.contains("#1123"))
+        assertFalse(result.cleanedText.contains("Merged"))
+        assertFalse(result.cleanedText.contains("merged 3 commits into"))
+        assertFalse(result.cleanedText.contains("Footer navigation"))
+
+        assertTrue(result.cleanedText.contains("Expose runtime diagnosability for gesture detector and surface in status/docs/tests"))
+        assertTrue(result.cleanedText.contains("Motivation"))
+        assertTrue(result.cleanedText.contains("Description"))
+        assertTrue(result.cleanedText.contains("Testing"))
+        assertTrue(result.cleanedText.contains("getRuntimeDiagnostics(): {"))
+        assertTrue(result.cleanedText.contains("The return type for getRuntimeDiagnostics is complex and duplicated"))
+    }
+
+    @Test
     fun `preserves real content lines that look like stat lines`() {
         val result = Engine.cleanText(
             RawInput(rawText = "# PR\nCommits 1\nI reviewed commits 1 through 5 in detail.\nShowing 3 changed files with 200 additions and 8 deletions."),

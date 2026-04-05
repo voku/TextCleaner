@@ -77,7 +77,7 @@ val GitHubRuleSet = CleanupRuleSet(
         "commented",
     ),
     prefixRegexes = listOf(
-        Regex("^(?:- - - )?Skip to content$", RegexOption.IGNORE_CASE),
+        Regex("^[- ]*Skip to content$", RegexOption.IGNORE_CASE),
         Regex("^Search or jump to\\.\\.\\.$", RegexOption.IGNORE_CASE),
         Regex("^\\d+$", RegexOption.IGNORE_CASE),
         Regex("^\\(\\d+\\)$", RegexOption.IGNORE_CASE),
@@ -134,6 +134,8 @@ val GitHubRuleSet = CleanupRuleSet(
         "Copilot uses AI. Check for mistakes.",
         "Mention @copilot in a comment to make changes to this pull request.",
         "Read all affected files",
+        "Merged",
+        "Outdated",
         // Discovered via static analysis of real PR samples
         "Conversation",
         "Conversations",
@@ -208,7 +210,9 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^Commits\\d+ \\(\\d+\\)$", RegexOption.IGNORE_CASE),
         Regex("^Checks\\d+ \\(\\d+\\)$", RegexOption.IGNORE_CASE),
         Regex("^Files changed\\d+ \\(\\d+\\)$", RegexOption.IGNORE_CASE),
-        Regex("^Lines changed: \\d+ additions & \\d+ deletions$", RegexOption.IGNORE_CASE),
+        Regex("^Lines changed: \\d+ additions (?:&|&amp;) \\d+ deletions$", RegexOption.IGNORE_CASE),
+        Regex("^#\\d+$", RegexOption.IGNORE_CASE),
+        Regex("^merged \\d+ commits? into$", RegexOption.IGNORE_CASE),
         Regex("^wants to merge \\d+ commits? into$", RegexOption.IGNORE_CASE),
         Regex("^.* wants to merge \\d+ commits? into .*$", RegexOption.IGNORE_CASE),
         Regex("^Reviewed commit: [a-f0-9]+$", RegexOption.IGNORE_CASE),
@@ -232,7 +236,7 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^@.+Reply\\.\\.\\.$", RegexOption.IGNORE_CASE),   // tab-less "Reply..." button variant
         Regex("^P[0-9] Badge .+", RegexOption.IGNORE_CASE),      // Codex/review priority badge lines
         Regex("^@[a-zA-Z0-9][a-zA-Z0-9._-]*$", RegexOption.IGNORE_CASE), // standalone @handle lines
-        Regex("^[a-f0-9]{7}$|^[a-f0-9]{40}$"),                          // short (7) and full (40) commit SHAs only
+        Regex("^(?:[a-f0-9]{7}|[a-f0-9]{40})$"),                       // short (7) and full (40) commit SHAs only
         // Discovered via analysis of GitHub Issue, Repo, and Files Changed pages
         Regex("^Used by \\d+( users?)?$", RegexOption.IGNORE_CASE),    // GitHub repo sidebar stat
         Regex("^\\d+ contributors?$", RegexOption.IGNORE_CASE),         // GitHub contributors count
