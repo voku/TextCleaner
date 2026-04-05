@@ -23,6 +23,9 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Settings',
     'Sign in',
     'Sign up',
+    // Lowercase variants (translation-copy mode where page text is downcased)
+    'More repository items',
+    'more repository items',
   ],
   suffixExactLines: [
     'Terms',
@@ -216,6 +219,34 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Confirm squash and merge',
     'Confirm rebase and merge',
     'This branch is up to date with the base branch.',
+    // Discovered via demo file analysis (real PR page with bot reviews and CodeRabbit)
+    'View reviewed changes',
+    'Commit suggestion',
+    '\uD83D\uDCDD Committable suggestion',
+    '\u203C\uFE0F IMPORTANT',
+    'Carefully review the code before committing. Ensure that it accurately replaces the highlighted code, contains no missing lines, and has no issues with indentation. Thoroughly test & benchmark the code to ensure it meets the requirements.',
+    'Verify each finding against the current code and only fix it if needed.',
+    '\uD83C\uDFC1 Script executed:',
+    '\uD83E\uDDE9 Analysis chain',
+    '\uD83E\uDDF0 Tools',
+    '\uD83E\uDE9B LanguageTool',
+    'Pull request successfully merged and closed',
+    'Delete branch',
+    '\uD83E\uDE84 Autofix (Beta)',
+    'Fix all unresolved CodeRabbit comments on this PR:',
+    'Push a commit to this branch (recommended)',
+    'Create a new PR with the fixes',
+    '\u2699\uFE0F Run configuration',
+    // Codex bot introduction lines
+    'Your team has set up Codex to review pull requests in this repo. Reviews are triggered when you',
+    'Open a pull request for review',
+    'Mark a draft as ready',
+    'Comment "@codex review".',
+    'If Codex has suggestions, it will comment; otherwise it will react with \uD83D\uDC4D.',
+    'Codex can also answer questions or update the PR. Try commenting "@codex address that feedback".',
+    // Single-word UI labels
+    'edited',
+    'Revert',
   ],
   removeAnywhereContains: [],
   removeAnywhereRegexes: [
@@ -306,6 +337,25 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^Copilot AI .+$/i,                                     // "Copilot AI assigned X and Y N ago", "Copilot AI reviewed..."
     /^Copilot (?:created|started|finished) .+$/i,           // "Copilot created this pull request...", "Copilot started/finished work..."
     /^.+ marked this pull request as (?:ready for review|draft).*$/i, // "user marked this pull request as ready for review"
+    // Discovered via demo file analysis (real PR with bot reviews and CodeRabbit analysis)
+    /^.+ bot reviewed\b/i,                                  // "gemini-code-assist bot reviewed", "coderabbitai bot reviewed"
+    /^Repository: .+$/,                                     // CodeRabbit script-analysis metadata
+    /^Length of output: \d+$/,                              // CodeRabbit script-analysis metadata
+    /^\d+ of \d+ checks (?:passed|failed)$/i,               // "146 of 148 checks passed"
+    /^\u26A0\uFE0F Potential issue.*$/,                     // ⚠️ Potential issue | 🟠 Major / 🟡 Minor
+    /^\uD83E\uDDF9 Nitpick comments.*$/,                    // 🧹 Nitpick comments (N)
+    /^Actionable comments posted: \d+$/i,                   // CodeRabbit review summary
+    /^\u270F\uFE0F Tip: /,                                  // ✏️ Tip: ... (CodeRabbit/LanguageTool tips)
+    /^You're all set[—\u2014\s].*/i,                        // "You're all set — the branch can be safely deleted."
+    /^Configuration used: .+$/,                             // CodeRabbit run config
+    /^Review profile: \w+$/i,                               // CodeRabbit run config
+    /^Plan: (?:Pro|Free|Team|Enterprise)$/i,                // CodeRabbit plan info
+    /^Run ID: [a-f0-9-]+$/,                                 // CodeRabbit run ID
+    /^\uD83D\uDCDC Files selected for processing \(\d+\)$/, // 📒 Files selected for processing (N)
+    /^\uD83D\uDCE5 Commits$/,                               // 📥 Commits section header
+    /^Reviewing files that changed from the base of the PR and between [a-f0-9]+ and [a-f0-9]+\.$/i, // CodeRabbit commit range
+    /^.+ #\d+: .+$/,                                        // Cross-PR references in CodeRabbit "Possibly related PRs" section
+    /^[+-]\d+\.\d{3}$/,                                     // European thousands-separator change counts (e.g. -6.106)
   ],
   preserveRegexes: [
     /^#+ /, // Headings
@@ -336,11 +386,24 @@ export const GitHubRuleSet: CleanupRuleSet = {
       start: /^.*\[bot\]$/i,
       maxLines: 30,
     },
-    // CodeRabbit "Suggested fix" block
+    // CodeRabbit "Suggested fix" block (plain header, ends at 📝 Committable suggestion)
+    // Using the committable-suggestion line as end marker handles blank lines inside the code.
     {
       start: /^Suggested fix$/i,
+      end: /^\uD83D\uDCDD Committable suggestion$/,
+      maxLines: 60,
+    },
+    // CodeRabbit "💡 Suggested fix" inline diff block (ends at next blank line)
+    {
+      start: /^\uD83D\uDCA1 Suggested fix$/i,
       end: /^$/,
-      maxLines: 40,
+      maxLines: 50,
+    },
+    // "📝 Committable suggestion" + boilerplate block (‼️ IMPORTANT, Carefully review...) to blank line
+    {
+      start: /^\uD83D\uDCDD Committable suggestion$/,
+      end: /^$/,
+      maxLines: 30,
     },
     // CodeRabbit summary block: "Summary by CodeRabbit" to next blank line
     {
@@ -362,10 +425,48 @@ export const GitHubRuleSet: CleanupRuleSet = {
       start: /^Sequence Diagram\(s\)$/i,
       maxLines: 60,
     },
-    // "Suggested change(s)" UI block: header + original/replacement to next blank line
+    // "Suggested change(s)" UI block: header + original/replacement, maxLines covers long diff blocks
     {
-      start: /^Suggested changes?$/i,
+      start: /^(?:\uD83D\uDCA1 )?Suggested changes?$/i,
+      maxLines: 25,
+    },
+    // CodeRabbit script execution trace: "🏁 Script executed:" to "Length of output: N"
+    // This removes the entire shell-script body including bash commands that would
+    // otherwise be preserved by the preserve-regexes (e.g. lines starting with #).
+    {
+      start: /^\uD83C\uDFC1 Script executed:$/,
+      end: /^Length of output: \d+$/,
+      maxLines: 80,
+    },
+    // "🚥 Pre-merge checks" table: removes the failed/passed check table block
+    {
+      start: /^\uD83D\uDEA5 Pre-merge checks/,
+      end: /^$/,
+      maxLines: 20,
+    },
+    // "❤️ Share" social-share section: removes X / Mastodon / Reddit / LinkedIn buttons
+    {
+      start: /^\u2764\uFE0F Share$/,
+      end: /^$/,
       maxLines: 10,
+    },
+    // "📒 Files selected for processing (N)" list: removes the per-file review manifest
+    // No blank line ends the list, so maxLines caps removal after the header + file entries.
+    {
+      start: /^\uD83D\uDCDC Files selected for processing \(\d+\)$/,
+      maxLines: 30,
+    },
+    // "🤖 Prompt for AI Agents" paragraph: header line plus its instruction text to next blank
+    {
+      start: /^\uD83E\uDD16 Prompt for AI Agents$/i,
+      end: /^$/,
+      maxLines: 25,
+    },
+    // "📥 Commits" reviewing section header + range description
+    {
+      start: /^\uD83D\uDCE5 Commits$/,
+      end: /^$/,
+      maxLines: 5,
     },
   ],
 };

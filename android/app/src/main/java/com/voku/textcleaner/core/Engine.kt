@@ -22,9 +22,14 @@ object Engine {
 
     /**
      * Normalize line endings to `\n`, trim outer whitespace, split into lines.
+     * Strips U+FFFC (Object Replacement Character) — web pages replace images/icons
+     * with this character when copied as plain text; it is always noise.
+     * Normalizes U+00A0 (No-Break Space) to a regular space — avoids mismatches
+     * against rule strings that use ordinary spaces.
      */
     fun normalizeText(text: String): List<String> =
         text.replace("\r\n", "\n").trim().split("\n")
+            .map { line -> line.replace("\uFFFC", "").replace("\u00A0", " ") }
 
     fun isPreserved(line: String, ruleSet: CleanupRuleSet): Boolean =
         ruleSet.preserveRegexes.any { it.containsMatchIn(line) }

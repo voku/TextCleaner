@@ -2161,3 +2161,425 @@ Privacy`;
     expect(nonBlankLines.length).toBeGreaterThanOrEqual(5);
   });
 });
+
+// ── New patterns discovered via demo file analysis ──────────────────────────
+
+describe('Text Normalization (FFFC / NBSP)', () => {
+  it('strips U+FFFC (Object Replacement Character) from each line', () => {
+    const result = normalizeText('line 1\n\uFFFC\nline\uFFFC2\n\uFFFC\uFFFC');
+    expect(result).toEqual(['line 1', '', 'line2', '']);
+  });
+
+  it('normalizes U+00A0 (No-Break Space) to a regular space', () => {
+    const result = normalizeText('more\u00A0repository items');
+    expect(result).toEqual(['more repository items']);
+  });
+
+  it('strips FFFC and normalizes NBSP in combination', () => {
+    const result = normalizeText('more\u00A0repository\uFFFC items');
+    expect(result).toEqual(['more repository items']);
+  });
+});
+
+describe('GitHub PR — demo file patterns', () => {
+  // ── Prefix trimming with "more repository items" ─────────────────────────
+
+  it('recognizes "More repository items" as a prefix junk line (Title Case)', () => {
+    const lines = [
+      'Skip to content',
+      'Repository navigation',
+      'Code', 'Issues', '2', '(2)', 'Pull requests', '12', '(12)',
+      'Agents', 'Discussions', 'Actions', 'Projects', 'Wiki',
+      'More repository items',
+      'PR title here',
+      'PR description.',
+    ];
+    const result = trimPrefix(lines, GitHubRuleSet);
+    expect(result[0]).toBe('PR title here');
+  });
+
+  it('recognizes "more repository items" (lowercase) as a prefix junk line', () => {
+    const lines = [
+      'skip to content',
+      '2', '(2)', '12', '(12)',
+      'more repository items',
+      'PR title here',
+      'PR description.',
+    ];
+    const result = trimPrefix(lines, GitHubRuleSet);
+    expect(result[0]).toBe('PR title here');
+  });
+
+  // ── FFFC + NBSP integration ───────────────────────────────────────────────
+
+  it('strips FFFC chars so blank-only lines do not block prefix trimming', () => {
+    // Without FFFC stripping these icon-only lines count as "unrecognized" and
+    // stop the prefix trimmer before it reaches the nav items.
+    const raw = [
+      'skip to content',
+      '\uFFFC',       // icon placeholder line (stripped → empty)
+      '\uFFFC\uFFFC', // double icon line (stripped → empty)
+      '2', '(2)',
+      'more repository items',
+      'PR title',
+      'Description.',
+    ].join('\n');
+    const result = cleanText({ rawText: raw, sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).toContain('PR title');
+    expect(result.cleanedText).not.toContain('skip to content');
+    expect(result.cleanedText).not.toContain('more repository items');
+  });
+
+  it('normalizes NBSP in nav items so they match prefix rules', () => {
+    // GitHub sometimes uses U+00A0 between words in nav labels.
+    const raw = [
+      'skip to content',
+      'more\u00A0repository items', // NBSP variant
+      'PR title',
+      'Description.',
+    ].join('\n');
+    const result = cleanText({ rawText: raw, sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).toContain('PR title');
+    expect(result.cleanedText).not.toContain('more');
+  });
+
+  // ── Bot review headers ────────────────────────────────────────────────────
+
+  it('removes "gemini-code-assist bot reviewed" header', () => {
+    const result = cleanText({
+      rawText: [
+        'PR description.',
+        'gemini-code-assist bot reviewed',
+        'View reviewed changes',
+        'The actual review text.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('gemini-code-assist bot reviewed');
+    expect(result.cleanedText).not.toContain('View reviewed changes');
+    expect(result.cleanedText).toContain('The actual review text.');
+  });
+
+  it('removes "coderabbitai bot reviewed" header', () => {
+    const result = cleanText({
+      rawText: 'Description.\ncoderabbitai bot reviewed\nView reviewed changes\nFeedback.',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('coderabbitai bot reviewed');
+    expect(result.cleanedText).not.toContain('View reviewed changes');
+    expect(result.cleanedText).toContain('Feedback.');
+  });
+
+  // ── CodeRabbit analysis metadata ─────────────────────────────────────────
+
+  it('removes "Repository:" and "Length of output:" CodeRabbit metadata lines', () => {
+    const result = cleanText({
+      rawText: [
+        'The review comment.',
+        'Repository: owner/repo',
+        'Length of output: 1475',
+        'More review text.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Repository: owner/repo');
+    expect(result.cleanedText).not.toContain('Length of output: 1475');
+    expect(result.cleanedText).toContain('The review comment.');
+    expect(result.cleanedText).toContain('More review text.');
+  });
+
+  it('removes "Actionable comments posted:" summary line', () => {
+    const result = cleanText({
+      rawText: 'Description.\nActionable comments posted: 7\nThe actual comment.',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Actionable comments posted:');
+    expect(result.cleanedText).toContain('The actual comment.');
+  });
+
+  it('removes "🧹 Nitpick comments (N)" header', () => {
+    const result = cleanText({
+      rawText: 'Description.\n\uD83E\uDDF9 Nitpick comments (3)\nThe actual comment.',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Nitpick comments');
+    expect(result.cleanedText).toContain('The actual comment.');
+  });
+
+  it('removes "⚠️ Potential issue" severity lines', () => {
+    const result = cleanText({
+      rawText: 'Description.\n\u26A0\uFE0F Potential issue | \uD83D\uDFE0 Major\nThe actual comment.',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Potential issue');
+    expect(result.cleanedText).toContain('The actual comment.');
+  });
+
+  it('removes "✏️ Tip:" LanguageTool/CodeRabbit tip lines', () => {
+    const result = cleanText({
+      rawText: 'Description.\n\u270F\uFE0F Tip: You can configure your own custom pre-merge checks in the settings.\nMore text.',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('\u270F\uFE0F Tip:');
+    expect(result.cleanedText).toContain('More text.');
+  });
+
+  it('removes "N of N checks passed/failed" summary', () => {
+    const result = cleanText({
+      rawText: 'Description.\n146 of 148 checks passed\nContent.',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('146 of 148 checks passed');
+    expect(result.cleanedText).toContain('Content.');
+  });
+
+  it('removes European thousands-separator change counts (e.g. +1.234)', () => {
+    // Positive values work fine. Negative values like -6.106 are protected by the
+    // filename preserve-regex: [a-zA-Z0-9_.-] includes '-' as a literal char at
+    // the end of the class, so '-6.106' is treated as a filename and preserved.
+    const result = cleanText({
+      rawText: 'PR title.\n+1.234\nContent.',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('+1.234');
+    expect(result.cleanedText).toContain('Content.');
+  });
+
+  // ── Block patterns ────────────────────────────────────────────────────────
+
+  it('removes "🏁 Script executed:" CodeRabbit analysis block to "Length of output:"', () => {
+    const result = cleanText({
+      rawText: [
+        'The review text.',
+        '\uD83C\uDFC1 Script executed:',
+        '# Look at the file',
+        'echo "=== file ==="',
+        'cat file.txt',
+        'Repository: owner/repo',
+        'Length of output: 1475',
+        'More review text.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Script executed');
+    expect(result.cleanedText).not.toContain('cat file.txt');
+    expect(result.cleanedText).not.toContain('Length of output');
+    expect(result.cleanedText).toContain('The review text.');
+    expect(result.cleanedText).toContain('More review text.');
+  });
+
+  it('removes "❤️ Share" social-share section (X, Mastodon, Reddit, LinkedIn)', () => {
+    const result = cleanText({
+      rawText: [
+        'The review text.',
+        '\u2764\uFE0F Share',
+        'X',
+        'Mastodon',
+        'Reddit',
+        'LinkedIn',
+        '',
+        'More text.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('\u2764\uFE0F Share');
+    expect(result.cleanedText).not.toContain('Mastodon');
+    expect(result.cleanedText).not.toContain('Reddit');
+    expect(result.cleanedText).not.toContain('LinkedIn');
+    expect(result.cleanedText).toContain('More text.');
+  });
+
+  it('removes "🚥 Pre-merge checks" table block', () => {
+    const result = cleanText({
+      rawText: [
+        'Description.',
+        '\uD83D\uDEA5 Pre-merge checks | \u2705 2 | \u274C 1',
+        '\u274C Failed checks (1 warning)',
+        'Check name\tStatus\tExplanation',
+        'Docstring Coverage\t\u26A0\uFE0F Warning\tCoverage is 0%',
+        '',
+        'The actual content.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Pre-merge checks');
+    expect(result.cleanedText).not.toContain('Docstring Coverage');
+    expect(result.cleanedText).toContain('The actual content.');
+  });
+
+  it('removes "📒 Files selected for processing" list header and filenames', () => {
+    const result = cleanText({
+      rawText: [
+        'Review intro.',
+        '\uD83D\uDCDC Files selected for processing (3)',
+        'src/foo.ts',
+        'src/bar.ts',
+        'src/baz.ts',
+        '',
+        'The actual review comment.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Files selected for processing');
+    expect(result.cleanedText).not.toContain('src/foo.ts');
+    expect(result.cleanedText).not.toContain('src/bar.ts');
+    // Content after a blank line following the list is preserved
+    expect(result.cleanedText).toContain('The actual review comment.');
+  });
+
+  it('removes "Suggested fix" block up to "📝 Committable suggestion" (handles blank lines inside code)', () => {
+    const result = cleanText({
+      rawText: [
+        'The review comment.',
+        'Suggested fix',
+        'function foo() {',
+        '  local x="$1"',
+        '',                // blank line inside code block
+        '  if [ -n "$x" ]; then',
+        '    echo "$x"',
+        '  fi',
+        '}',
+        '\uD83D\uDCDD Committable suggestion',
+        '',
+        'More review text.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Suggested fix');
+    expect(result.cleanedText).not.toContain('function foo()');
+    expect(result.cleanedText).toContain('The review comment.');
+    expect(result.cleanedText).toContain('More review text.');
+  });
+
+  it('removes "💡 Suggested fix" inline diff block ending at blank line', () => {
+    const result = cleanText({
+      rawText: [
+        'The review comment.',
+        '\uD83D\uDCA1 Suggested fix',
+        '-  let x = 1;',
+        '+  let x = null;',
+        '\uD83E\uDD16 Prompt for AI Agents',
+        'Some instructions.',
+        '',
+        'More review text.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Suggested fix');
+    expect(result.cleanedText).not.toContain('let x = 1');
+    expect(result.cleanedText).toContain('The review comment.');
+    expect(result.cleanedText).toContain('More review text.');
+  });
+
+  it('removes "💡 Suggested change" block (emoji prefix variant)', () => {
+    const result = cleanText({
+      rawText: [
+        'Review comment.',
+        '\uD83D\uDCA1 Suggested change',
+        '-const x = foo ? foo : "default";',
+        '+const x = foo ?? "default";',
+        '',
+        'More text.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Suggested change');
+    expect(result.cleanedText).not.toContain('const x = foo');
+    expect(result.cleanedText).toContain('Review comment.');
+    expect(result.cleanedText).toContain('More text.');
+  });
+
+  it('removes "🤖 Prompt for AI Agents" block including its paragraph', () => {
+    const result = cleanText({
+      rawText: [
+        'The review comment.',
+        '\uD83E\uDD16 Prompt for AI Agents',
+        'Verify each finding against the current code and only fix it if needed.',
+        'In `@src/file.ts` at line 42, update the function to handle null.',
+        '',
+        'More review text.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Prompt for AI Agents');
+    expect(result.cleanedText).not.toContain('Verify each finding');
+    expect(result.cleanedText).not.toContain('update the function to handle null');
+    expect(result.cleanedText).toContain('The review comment.');
+    expect(result.cleanedText).toContain('More review text.');
+  });
+
+  it('removes CodeRabbit run configuration lines', () => {
+    const result = cleanText({
+      rawText: [
+        'Review text.',
+        '\u2699\uFE0F Run configuration',
+        'Configuration used: Organization UI',
+        '',
+        'Review profile: CHILL',
+        '',
+        'Plan: Pro',
+        '',
+        'Run ID: 4a4099d8-00c3-4226-969b-2944f9ec9ff1',
+        '',
+        'More review text.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Run configuration');
+    expect(result.cleanedText).not.toContain('Configuration used:');
+    expect(result.cleanedText).not.toContain('Review profile:');
+    expect(result.cleanedText).not.toContain('Plan: Pro');
+    expect(result.cleanedText).not.toContain('Run ID:');
+    expect(result.cleanedText).toContain('More review text.');
+  });
+
+  it('removes Codex bot introduction text', () => {
+    const result = cleanText({
+      rawText: [
+        'Review text.',
+        'Your team has set up Codex to review pull requests in this repo. Reviews are triggered when you',
+        '',
+        'Open a pull request for review',
+        'Mark a draft as ready',
+        'Comment "@codex review".',
+        '',
+        'More review text.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Your team has set up Codex');
+    expect(result.cleanedText).not.toContain('Open a pull request for review');
+    expect(result.cleanedText).not.toContain('Mark a draft as ready');
+    expect(result.cleanedText).toContain('More review text.');
+  });
+
+  it('removes "Pull request successfully merged and closed" and "Delete branch"', () => {
+    const result = cleanText({
+      rawText: [
+        'Content.',
+        'Pull request successfully merged and closed',
+        'Delete branch',
+        'More content.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Pull request successfully merged and closed');
+    expect(result.cleanedText).not.toContain('Delete branch');
+    expect(result.cleanedText).toContain('More content.');
+  });
+
+  it('removes cross-PR references matching "title #N: description" pattern', () => {
+    const result = cleanText({
+      rawText: [
+        'Possibly related PRs',
+        'chore: update deps #253: Consolidates CI workflow changes.',
+        'feat: add feature #339: Modifies integration test tooling.',
+        'More review text.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('#253:');
+    expect(result.cleanedText).not.toContain('#339:');
+    expect(result.cleanedText).toContain('More review text.');
+  });
+});

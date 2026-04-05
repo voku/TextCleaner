@@ -30,6 +30,9 @@ val GitHubRuleSet = CleanupRuleSet(
         "Settings",
         "Sign in",
         "Sign up",
+        // Lowercase variants (translation-copy mode where page text is downcased)
+        "More repository items",
+        "more repository items",
     ),
     suffixExactLines = listOf(
         "Terms",
@@ -223,6 +226,34 @@ val GitHubRuleSet = CleanupRuleSet(
         "Confirm squash and merge",
         "Confirm rebase and merge",
         "This branch is up to date with the base branch.",
+        // Discovered via demo file analysis (real PR page with bot reviews and CodeRabbit)
+        "View reviewed changes",
+        "Commit suggestion",
+        "\uD83D\uDCDD Committable suggestion",
+        "\u203C\uFE0F IMPORTANT",
+        "Carefully review the code before committing. Ensure that it accurately replaces the highlighted code, contains no missing lines, and has no issues with indentation. Thoroughly test & benchmark the code to ensure it meets the requirements.",
+        "Verify each finding against the current code and only fix it if needed.",
+        "\uD83C\uDFC1 Script executed:",
+        "\uD83E\uDDE9 Analysis chain",
+        "\uD83E\uDDF0 Tools",
+        "\uD83E\uDE9B LanguageTool",
+        "Pull request successfully merged and closed",
+        "Delete branch",
+        "\uD83E\uDE84 Autofix (Beta)",
+        "Fix all unresolved CodeRabbit comments on this PR:",
+        "Push a commit to this branch (recommended)",
+        "Create a new PR with the fixes",
+        "\u2699\uFE0F Run configuration",
+        // Codex bot introduction lines
+        "Your team has set up Codex to review pull requests in this repo. Reviews are triggered when you",
+        "Open a pull request for review",
+        "Mark a draft as ready",
+        "Comment \"@codex review\".",
+        "If Codex has suggestions, it will comment; otherwise it will react with \uD83D\uDC4D.",
+        "Codex can also answer questions or update the PR. Try commenting \"@codex address that feedback\".",
+        // Single-word UI labels
+        "edited",
+        "Revert",
     ),
     removeAnywhereContains = emptyList(),
     removeAnywhereRegexes = listOf(
@@ -313,6 +344,25 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^Copilot AI .+$", RegexOption.IGNORE_CASE),                       // "Copilot AI assigned X and Y N ago", "Copilot AI reviewed..."
         Regex("^Copilot (?:created|started|finished) .+$", RegexOption.IGNORE_CASE), // "Copilot created/started/finished work..."
         Regex("^.+ marked this pull request as (?:ready for review|draft).*$", RegexOption.IGNORE_CASE), // PR state change
+        // Discovered via demo file analysis (real PR with bot reviews and CodeRabbit analysis)
+        Regex("^.+ bot reviewed\\b", RegexOption.IGNORE_CASE),                   // "gemini-code-assist bot reviewed", "coderabbitai bot reviewed"
+        Regex("^Repository: .+$"),                                                // CodeRabbit script-analysis metadata
+        Regex("^Length of output: \\d+$"),                                        // CodeRabbit script-analysis metadata
+        Regex("^\\d+ of \\d+ checks (?:passed|failed)$", RegexOption.IGNORE_CASE), // "146 of 148 checks passed"
+        Regex("^\u26A0\uFE0F Potential issue.*$"),                               // ⚠️ Potential issue | 🟠 Major / 🟡 Minor
+        Regex("^\uD83E\uDDF9 Nitpick comments.*$"),                              // 🧹 Nitpick comments (N)
+        Regex("^Actionable comments posted: \\d+$", RegexOption.IGNORE_CASE),    // CodeRabbit review summary
+        Regex("^\u270F\uFE0F Tip: "),                                             // ✏️ Tip: ... (CodeRabbit/LanguageTool tips)
+        Regex("^You're all set[—\u2014\\s].*", RegexOption.IGNORE_CASE),         // "You're all set — the branch can be safely deleted."
+        Regex("^Configuration used: .+$"),                                        // CodeRabbit run config
+        Regex("^Review profile: \\w+$", RegexOption.IGNORE_CASE),                // CodeRabbit run config
+        Regex("^Plan: (?:Pro|Free|Team|Enterprise)$", RegexOption.IGNORE_CASE),  // CodeRabbit plan info
+        Regex("^Run ID: [a-f0-9-]+$"),                                            // CodeRabbit run ID
+        Regex("^\uD83D\uDCDC Files selected for processing \\(\\d+\\)$"),        // 📒 Files selected for processing (N)
+        Regex("^\uD83D\uDCE5 Commits$"),                                          // 📥 Commits section header
+        Regex("^Reviewing files that changed from the base of the PR and between [a-f0-9]+ and [a-f0-9]+\\.$", RegexOption.IGNORE_CASE), // CodeRabbit commit range
+        Regex("^.+ #\\d+: .+$"),                                                  // Cross-PR references in CodeRabbit "Possibly related PRs" section
+        Regex("^[+-]\\d+\\.\\d{3}$"),                                             // European thousands-separator change counts (e.g. -6.106)
     ),
     preserveRegexes = listOf(
         Regex("^#+ "),                              // Headings
@@ -343,11 +393,24 @@ val GitHubRuleSet = CleanupRuleSet(
             start = Regex("^.*\\[bot]$", RegexOption.IGNORE_CASE),
             maxLines = 30,
         ),
-        // CodeRabbit "Suggested fix" block
+        // CodeRabbit "Suggested fix" block (plain header, ends at 📝 Committable suggestion)
+        // Using the committable-suggestion line as end marker handles blank lines inside the code.
         BlockPattern(
             start = Regex("^Suggested fix$", RegexOption.IGNORE_CASE),
+            end = Regex("^\uD83D\uDCDD Committable suggestion$"),
+            maxLines = 60,
+        ),
+        // CodeRabbit "💡 Suggested fix" inline diff block (ends at next blank line)
+        BlockPattern(
+            start = Regex("^\uD83D\uDCA1 Suggested fix$", RegexOption.IGNORE_CASE),
             end = Regex("^$"),
-            maxLines = 40,
+            maxLines = 50,
+        ),
+        // "📝 Committable suggestion" + boilerplate block (‼️ IMPORTANT, Carefully review...) to blank line
+        BlockPattern(
+            start = Regex("^\uD83D\uDCDD Committable suggestion$"),
+            end = Regex("^$"),
+            maxLines = 30,
         ),
         // CodeRabbit summary block: "Summary by CodeRabbit" to next blank line
         BlockPattern(
@@ -369,10 +432,48 @@ val GitHubRuleSet = CleanupRuleSet(
             start = Regex("^Sequence Diagram\\(s\\)$", RegexOption.IGNORE_CASE),
             maxLines = 60,
         ),
-        // "Suggested change(s)" UI block: header + original/replacement to next blank line
+        // "Suggested change(s)" UI block: header + original/replacement, maxLines covers long diff blocks
         BlockPattern(
-            start = Regex("^Suggested changes?$", RegexOption.IGNORE_CASE),
+            start = Regex("^(?:\uD83D\uDCA1 )?Suggested changes?$", RegexOption.IGNORE_CASE),
+            maxLines = 25,
+        ),
+        // CodeRabbit script execution trace: "🏁 Script executed:" to "Length of output: N"
+        // This removes the entire shell-script body including bash commands that would
+        // otherwise be preserved by the preserve-regexes (e.g. lines starting with #).
+        BlockPattern(
+            start = Regex("^\uD83C\uDFC1 Script executed:$"),
+            end = Regex("^Length of output: \\d+$"),
+            maxLines = 80,
+        ),
+        // "🚥 Pre-merge checks" table: removes the failed/passed check table block
+        BlockPattern(
+            start = Regex("^\uD83D\uDEA5 Pre-merge checks"),
+            end = Regex("^$"),
+            maxLines = 20,
+        ),
+        // "❤️ Share" social-share section: removes X / Mastodon / Reddit / LinkedIn buttons
+        BlockPattern(
+            start = Regex("^\u2764\uFE0F Share$"),
+            end = Regex("^$"),
             maxLines = 10,
+        ),
+        // "📒 Files selected for processing (N)" list: removes the per-file review manifest
+        // No blank line ends the list, so maxLines caps removal after the header + file entries.
+        BlockPattern(
+            start = Regex("^\uD83D\uDCDC Files selected for processing \\(\\d+\\)$"),
+            maxLines = 30,
+        ),
+        // "🤖 Prompt for AI Agents" paragraph: header line plus its instruction text to next blank
+        BlockPattern(
+            start = Regex("^\uD83E\uDD16 Prompt for AI Agents$", RegexOption.IGNORE_CASE),
+            end = Regex("^$"),
+            maxLines = 25,
+        ),
+        // "📥 Commits" reviewing section header + range description
+        BlockPattern(
+            start = Regex("^\uD83D\uDCE5 Commits$"),
+            end = Regex("^$"),
+            maxLines = 5,
         ),
     ),
 )

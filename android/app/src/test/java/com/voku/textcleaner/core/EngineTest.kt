@@ -2345,4 +2345,202 @@ Do not share my personal information
         val nonBlankLines = result.cleanedText.lines().filter { it.trim().isNotEmpty() }
         assertTrue("Expected at least 10 non-blank lines preserved but got ${nonBlankLines.size}", nonBlankLines.size >= 10)
     }
+
+    // ── New patterns discovered via demo file analysis ───────────────────
+
+    @Test
+    fun `normalizeText strips U+FFFC (Object Replacement Character)`() {
+        val result = Engine.normalizeText("line 1\n\uFFFC\nline\uFFFC2\n\uFFFC\uFFFC")
+        assertEquals(listOf("line 1", "", "line2", ""), result)
+    }
+
+    @Test
+    fun `normalizeText normalizes U+00A0 (No-Break Space) to regular space`() {
+        val result = Engine.normalizeText("more\u00A0repository items")
+        assertEquals(listOf("more repository items"), result)
+    }
+
+    @Test
+    fun `recognizes lowercase 'more repository items' as prefix junk`() {
+        val lines = listOf("skip to content", "2", "(2)", "12", "(12)", "more repository items", "PR title here", "PR description.")
+        val result = Engine.trimPrefix(lines, GitHubRuleSet)
+        assertEquals("PR title here", result.firstOrNull())
+    }
+
+    @Test
+    fun `recognizes Title-Case 'More repository items' as prefix junk`() {
+        val lines = listOf("Skip to content", "2", "(2)", "More repository items", "PR title here", "PR description.")
+        val result = Engine.trimPrefix(lines, GitHubRuleSet)
+        assertEquals("PR title here", result.firstOrNull())
+    }
+
+    @Test
+    fun `removes 'bot reviewed' header variants`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "PR description.\ngemini-code-assist bot reviewed\nView reviewed changes\nThe actual review text.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("gemini-code-assist bot reviewed"))
+        assertFalse(result.cleanedText.contains("View reviewed changes"))
+        assertTrue(result.cleanedText.contains("The actual review text."))
+    }
+
+    @Test
+    fun `removes CodeRabbit analysis metadata lines (Repository and Length of output)`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "The review comment.\nRepository: owner/repo\nLength of output: 1475\nMore review text.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Repository: owner/repo"))
+        assertFalse(result.cleanedText.contains("Length of output: 1475"))
+        assertTrue(result.cleanedText.contains("The review comment."))
+        assertTrue(result.cleanedText.contains("More review text."))
+    }
+
+    @Test
+    fun `removes Actionable comments posted summary`() {
+        val result = Engine.cleanText(
+            RawInput(rawText = "Description.\nActionable comments posted: 7\nThe actual comment.", sourceTypeHint = SourceType.GITHUB_PR),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Actionable comments posted:"))
+        assertTrue(result.cleanedText.contains("The actual comment."))
+    }
+
+    @Test
+    fun `removes N of N checks passed summary`() {
+        val result = Engine.cleanText(
+            RawInput(rawText = "Description.\n146 of 148 checks passed\nContent.", sourceTypeHint = SourceType.GITHUB_PR),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("146 of 148 checks passed"))
+        assertTrue(result.cleanedText.contains("Content."))
+    }
+
+    @Test
+    fun `removes 'Suggested fix' block up to Committable suggestion (handles blank lines inside code)`() {
+        // Note: using regular (non-raw) string to allow \uXXXX escapes.
+        val committable = "\uD83D\uDCDD Committable suggestion"
+        val rawText = "The review comment.\nSuggested fix\nfunction foo() {\n  local x=\"\$1\"\n\n  if [ -n \"\$x\" ]; then\n    echo \"\$x\"\n  fi\n}\n$committable\n\nMore review text."
+        val result = Engine.cleanText(
+            RawInput(rawText = rawText, sourceTypeHint = SourceType.GITHUB_PR),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Suggested fix"))
+        assertFalse(result.cleanedText.contains("function foo()"))
+        assertTrue(result.cleanedText.contains("The review comment."))
+        assertTrue(result.cleanedText.contains("More review text."))
+    }
+
+    @Test
+    fun `removes Script executed block (including bash script content to Length of output)`() {
+        // Note: using regular (non-raw) string to allow \uXXXX emoji escapes.
+        val scriptHeader = "\uD83C\uDFC1 Script executed:"
+        val rawText = "The review text.\n$scriptHeader\n# Look at the file\necho \"=== file ===\"\ncat file.txt\nRepository: owner/repo\nLength of output: 1475\nMore review text."
+        val result = Engine.cleanText(
+            RawInput(rawText = rawText, sourceTypeHint = SourceType.GITHUB_PR),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Script executed"))
+        assertFalse(result.cleanedText.contains("cat file.txt"))
+        assertFalse(result.cleanedText.contains("Length of output"))
+        assertTrue(result.cleanedText.contains("The review text."))
+        assertTrue(result.cleanedText.contains("More review text."))
+    }
+
+    @Test
+    fun `removes Share social-share section (Mastodon, Reddit, LinkedIn)`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "The review text.\n\u2764\uFE0F Share\nX\nMastodon\nReddit\nLinkedIn\n\nMore text.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("\u2764\uFE0F Share"))
+        assertFalse(result.cleanedText.contains("Mastodon"))
+        assertFalse(result.cleanedText.contains("Reddit"))
+        assertFalse(result.cleanedText.contains("LinkedIn"))
+        assertTrue(result.cleanedText.contains("More text."))
+    }
+
+    @Test
+    fun `removes Prompt for AI Agents block including instruction paragraph`() {
+        // Note: using regular (non-raw) string to allow \uXXXX emoji escapes.
+        val promptHeader = "\uD83E\uDD16 Prompt for AI Agents"
+        val rawText = "The review comment.\n$promptHeader\nVerify each finding against the current code and only fix it if needed.\nIn `@src/file.ts` at line 42, update the function to handle null.\n\nMore review text."
+        val result = Engine.cleanText(
+            RawInput(rawText = rawText, sourceTypeHint = SourceType.GITHUB_PR),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Prompt for AI Agents"))
+        assertFalse(result.cleanedText.contains("Verify each finding"))
+        assertFalse(result.cleanedText.contains("update the function to handle null"))
+        assertTrue(result.cleanedText.contains("The review comment."))
+        assertTrue(result.cleanedText.contains("More review text."))
+    }
+
+    @Test
+    fun `removes cross-PR references matching title #N description pattern`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "Possibly related PRs\nchore: update deps #253: Consolidates CI workflow changes.\nMore review text.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("#253:"))
+        assertTrue(result.cleanedText.contains("More review text."))
+    }
+
+    @Test
+    fun `removes Codex bot introduction text`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "Review text.\nYour team has set up Codex to review pull requests in this repo. Reviews are triggered when you\n\nOpen a pull request for review\nMark a draft as ready\n\nMore review text.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Your team has set up Codex"))
+        assertFalse(result.cleanedText.contains("Open a pull request for review"))
+        assertFalse(result.cleanedText.contains("Mark a draft as ready"))
+        assertTrue(result.cleanedText.contains("More review text."))
+    }
+
+    @Test
+    fun `removes Pull request successfully merged and closed and Delete branch`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "Content.\nPull request successfully merged and closed\nDelete branch\nMore content.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Pull request successfully merged and closed"))
+        assertFalse(result.cleanedText.contains("Delete branch"))
+        assertTrue(result.cleanedText.contains("More content."))
+    }
+
+    @Test
+    fun `removes CodeRabbit run configuration lines`() {
+        val runConfig = "\u2699\uFE0F Run configuration"
+        val rawText = "Review text.\n$runConfig\nConfiguration used: Organization UI\n\nReview profile: CHILL\n\nPlan: Pro\n\nRun ID: 4a4099d8-00c3-4226-969b-2944f9ec9ff1\n\nMore review text."
+        val result = Engine.cleanText(
+            RawInput(rawText = rawText, sourceTypeHint = SourceType.GITHUB_PR),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Run configuration"))
+        assertFalse(result.cleanedText.contains("Configuration used:"))
+        assertFalse(result.cleanedText.contains("Review profile:"))
+        assertFalse(result.cleanedText.contains("Plan: Pro"))
+        assertFalse(result.cleanedText.contains("Run ID:"))
+        assertTrue(result.cleanedText.contains("More review text."))
+    }
 }
