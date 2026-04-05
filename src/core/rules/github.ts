@@ -71,7 +71,7 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'commented',
   ],
   prefixRegexes: [
-    /^[- ]*Skip to content$/i,
+    /^(?:- )*Skip to content$/i,
     /^Search or jump to\.\.\.$/i,
     /^\d+$/i,
     /^\(\d+\)$/i,
@@ -240,7 +240,7 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^Showing \d+ changed files? with \d+ additions? and \d+ deletions?\.$/i, // diff summary
     /^\u00B7\s+\d+ comments?$/i,                  // "· N comments" middle-dot separator (U+00B7)
     /^\u00B7$/,                                    // standalone middle-dot separator
-    /^[a-zA-Z0-9][a-zA-Z0-9._-]+ changed the title .*$/i, // GitHub issue title-change event (username ≥2 chars)
+    /^[a-zA-Z0-9][a-zA-Z0-9._-]* changed the title .*$/i, // GitHub issue title-change event (username ≥1 char)
     /^Some comments are outside the diff and can[''\u2019]t be posted inline due to platform limitations\.$/i, // platform note (both apostrophe variants)
     /^yesterday$/i,                               // relative timestamp not covered by existing rule
     /^last (week|month|year)$/i,                  // relative timestamp
