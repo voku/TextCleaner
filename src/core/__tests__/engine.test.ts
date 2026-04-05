@@ -609,6 +609,9 @@ Contact
     expect(result.cleanedText).not.toContain('⚠️ Outside diff range comments (1)');
     expect(result.cleanedText).not.toContain('Useful? React with 👍 / 👎.');
     expect(result.cleanedText).not.toContain('@voku\tReply...');
+    expect(result.cleanedText).not.toMatch(/^\+142$/m);
+    expect(result.cleanedText).not.toMatch(/^-15$/m);
+    expect(result.cleanedText).not.toContain('Mention @copilot in a comment to make changes to this pull request.');
   });
 
   it('does not destroy legitimate user content (blind spot fix)', () => {
@@ -967,5 +970,9 @@ Do not share my personal information
     expect(result.cleanedText).not.toContain('⚠️ Outside diff range comments (1)');
     expect(result.cleanedText).not.toContain('Useful? React with 👍 / 👎.');
     expect(result.cleanedText).not.toContain('@voku\tReply...');
+    expect(result.cleanedText).not.toMatch(/^\+200$/m);
+    expect(result.cleanedText).not.toMatch(/^-8$/m);
+    expect(result.cleanedText).not.toContain('Mention @copilot in a comment to make changes to this pull request.');
+    expect(result.cleanedText).not.toContain('1 participant');
   });
 });

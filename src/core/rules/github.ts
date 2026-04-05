@@ -79,7 +79,7 @@ export const GitHubRuleSet: CleanupRuleSet = {
   suffixRegexes: [
     /^\u00A9 \d{4} GitHub, Inc\.$/i,
     /^@.+$/i,
-    /^\d+ more reviewer$/i,
+    /^\+?\d+ more reviewers?$/i,
   ],
   removeAnywhereExactLines: [
     'Copy link',
@@ -122,6 +122,12 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Owner',
     'commented',
     'Contributor',
+    'Review requested',
+    'Copilot code review',
+    'Copilot requested your review on this pull request.',
+    'Copilot uses AI. Check for mistakes.',
+    'Mention @copilot in a comment to make changes to this pull request.',
+    'Read all affected files',
   ],
   removeAnywhereContains: [],
   removeAnywhereRegexes: [
@@ -162,6 +168,9 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^Useful\? React with 👍 \/ 👎\.$/i,
     /^Reply\.\.\.$/i,
     /^@.+\s+Reply\.\.\.$/i,
+    /^\+\d+$/,
+    /^-\d+$/,
+    /^\d+ participants?$/i,
   ],
   preserveRegexes: [
     /^#+ /, // Headings

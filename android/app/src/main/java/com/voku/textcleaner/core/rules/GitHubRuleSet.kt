@@ -85,7 +85,7 @@ val GitHubRuleSet = CleanupRuleSet(
     suffixRegexes = listOf(
         Regex("^\u00A9 \\d{4} GitHub, Inc\\.$", RegexOption.IGNORE_CASE),
         Regex("^@.+$", RegexOption.IGNORE_CASE),
-        Regex("^\\d+ more reviewer$", RegexOption.IGNORE_CASE),
+        Regex("^\\+?\\d+ more reviewers?$", RegexOption.IGNORE_CASE),
     ),
     removeAnywhereExactLines = listOf(
         "Copy link",
@@ -128,6 +128,12 @@ val GitHubRuleSet = CleanupRuleSet(
         "Owner",
         "commented",
         "Contributor",
+        "Review requested",
+        "Copilot code review",
+        "Copilot requested your review on this pull request.",
+        "Copilot uses AI. Check for mistakes.",
+        "Mention @copilot in a comment to make changes to this pull request.",
+        "Read all affected files",
     ),
     removeAnywhereContains = emptyList(),
     removeAnywhereRegexes = listOf(
@@ -168,6 +174,9 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^Useful\\? React with \uD83D\uDC4D / \uD83D\uDC4E\\.$", RegexOption.IGNORE_CASE),
         Regex("^Reply\\.\\.\\.$", RegexOption.IGNORE_CASE),
         Regex("^@.+\\s+Reply\\.\\.\\.$", RegexOption.IGNORE_CASE),
+        Regex("^\\+\\d+$"),
+        Regex("^-\\d+$"),
+        Regex("^\\d+ participants?$", RegexOption.IGNORE_CASE),
     ),
     preserveRegexes = listOf(
         Regex("^#+ "),                              // Headings

@@ -653,6 +653,9 @@ Contact
         assertFalse(result.cleanedText.contains("\u26A0\uFE0F Outside diff range comments (1)"))
         assertFalse(result.cleanedText.contains("Useful? React with \uD83D\uDC4D / \uD83D\uDC4E."))
         assertFalse(result.cleanedText.contains("@voku\tReply..."))
+        assertFalse(result.cleanedText.lines().any { it == "+142" })
+        assertFalse(result.cleanedText.lines().any { it == "-15" })
+        assertFalse(result.cleanedText.contains("Mention @copilot in a comment to make changes to this pull request."))
     }
 
     @Test
@@ -1009,5 +1012,9 @@ Do not share my personal information
         assertFalse(result.cleanedText.contains("\u26A0\uFE0F Outside diff range comments (1)"))
         assertFalse(result.cleanedText.contains("Useful? React with \uD83D\uDC4D / \uD83D\uDC4E."))
         assertFalse(result.cleanedText.contains("@voku\tReply..."))
+        assertFalse(result.cleanedText.lines().any { it == "+200" })
+        assertFalse(result.cleanedText.lines().any { it == "-8" })
+        assertFalse(result.cleanedText.contains("Mention @copilot in a comment to make changes to this pull request."))
+        assertFalse(result.cleanedText.contains("1 participant"))
     }
 }
