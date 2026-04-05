@@ -51,6 +51,8 @@ val GitHubRuleSet = CleanupRuleSet(
         "Footer",
         "1 participant",
         "You\u2019re receiving notifications because you were mentioned.",
+        "You\u2019re receiving notifications because you were assigned.",
+        "You\u2019re receiving notifications because you are watching this repository.",
         "Customize",
         "Notifications",
         "None yet",
@@ -134,6 +136,8 @@ val GitHubRuleSet = CleanupRuleSet(
         "Copilot requested your review on this pull request.",
         "Copilot uses AI. Check for mistakes.",
         "Mention @copilot in a comment to make changes to this pull request.",
+        "Copilot AI",
+        "Review has been requested on this pull request. It is not required to merge. Learn more about requesting a pull request review.",
         "Read all affected files",
         "Merged",
         "Outdated",
@@ -288,23 +292,27 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^(a|an) (minute|hour|day|week|month|year) ago$", RegexOption.IGNORE_CASE), // singular relative timestamp
         Regex("^\\d+% of \\d+ files? viewed$", RegexOption.IGNORE_CASE), // Files Changed progress indicator
         // Mid-body noise (blind-spot analysis: merge events, review events, severity labels)
-        Regex("^.* approved these changes$", RegexOption.IGNORE_CASE),              // "username approved these changes"
-        Regex("^.* dismissed .* review$", RegexOption.IGNORE_CASE),                 // "username dismissed someone's review"
-        Regex("^.* requested changes$", RegexOption.IGNORE_CASE),                   // "username requested changes"
-        Regex("^.* merged commit [a-f0-9]+ into .*$", RegexOption.IGNORE_CASE),    // "user merged commit abc123 into main"
-        Regex("^.* deleted the .* branch$", RegexOption.IGNORE_CASE),              // "user deleted the feature branch"
-        Regex("^.* added \\d+ commits? .*$", RegexOption.IGNORE_CASE),             // "user added 3 commits month ago"
+        Regex("^.* approved these changes$", RegexOption.IGNORE_CASE),          // "username approved these changes"
+        Regex("^.* dismissed .* review$", RegexOption.IGNORE_CASE),             // "username dismissed someone's review"
+        Regex("^.* requested changes$", RegexOption.IGNORE_CASE),               // "username requested changes"
+        Regex("^.* merged commit [a-f0-9]+ into .*$", RegexOption.IGNORE_CASE), // "user merged commit abc123 into main"
+        Regex("^.* deleted the .* branch$", RegexOption.IGNORE_CASE),           // "user deleted the feature branch"
+        Regex("^.* added \\d+ commits? .*$", RegexOption.IGNORE_CASE),          // "user added 3 commits month ago"
         Regex("^.* force-pushed the .* branch from .* to .*$", RegexOption.IGNORE_CASE), // force-push event
         Regex("^\\d+ checks? (passed|failed|pending|skipped)$", RegexOption.IGNORE_CASE), // "3 checks passed"
-        Regex("^This was referenced .*$", RegexOption.IGNORE_CASE),                // "This was referenced Oct 3"
-        Regex("^.* referenced this .*$", RegexOption.IGNORE_CASE),                 // "user referenced this pull request"
-        Regex("^This comment was marked as .*$", RegexOption.IGNORE_CASE),         // "This comment was marked as resolved"
-        Regex("^Suggested fix$", RegexOption.IGNORE_CASE),                         // CodeRabbit suggested fix header
-        Regex("^medium$", RegexOption.IGNORE_CASE),                                // standalone severity label
-        Regex("^low$", RegexOption.IGNORE_CASE),                                   // standalone severity label
-        Regex("^high$", RegexOption.IGNORE_CASE),                                  // standalone severity label
-        Regex("^critical$", RegexOption.IGNORE_CASE),                              // standalone severity label
-        Regex("^informational$", RegexOption.IGNORE_CASE),                         // standalone severity label
+        Regex("^This was referenced .*$", RegexOption.IGNORE_CASE),             // "This was referenced Oct 3"
+        Regex("^.* referenced this .*$", RegexOption.IGNORE_CASE),              // "user referenced this pull request"
+        Regex("^This comment was marked as .*$", RegexOption.IGNORE_CASE),      // "This comment was marked as resolved"
+        Regex("^Suggested fix$", RegexOption.IGNORE_CASE),                      // CodeRabbit suggested fix header
+        Regex("^medium$", RegexOption.IGNORE_CASE),                             // standalone severity label
+        Regex("^low$", RegexOption.IGNORE_CASE),                                // standalone severity label
+        Regex("^high$", RegexOption.IGNORE_CASE),                               // standalone severity label
+        Regex("^critical$", RegexOption.IGNORE_CASE),                           // standalone severity label
+        Regex("^informational$", RegexOption.IGNORE_CASE),                      // standalone severity label
+        // Copilot agent lifecycle events (discovered via real mobile PR page paste)
+        Regex("^Copilot AI .+$", RegexOption.IGNORE_CASE),                       // "Copilot AI assigned X and Y N ago", "Copilot AI reviewed..."
+        Regex("^Copilot (?:created|started|finished) .+$", RegexOption.IGNORE_CASE), // "Copilot created/started/finished work..."
+        Regex("^.+ marked this pull request as (?:ready for review|draft).*$", RegexOption.IGNORE_CASE), // PR state change
     ),
     preserveRegexes = listOf(
         Regex("^#+ "),                              // Headings
@@ -321,25 +329,50 @@ val GitHubRuleSet = CleanupRuleSet(
     blockPatterns = listOf(
         // CodeRabbit review table: "Cohort / File(s)  Summary" to next blank line
         BlockPattern(
-            start = Regex("^Cohort / File\\(s\\)\\tSummary$", RegexOption.IGNORE_CASE),
+            start = Regex("^Cohort / File\\(s\\)\\s+Summary$", RegexOption.IGNORE_CASE),
             maxLines = 80,
         ),
         // CodeRabbit "Finishing Touches" section
         BlockPattern(
-            start = Regex("^\u2728 Finishing Touches$"),
+            start = Regex("^\u2728 Finishing Touches$", RegexOption.IGNORE_CASE),
             end = Regex("^$"),
             maxLines = 30,
         ),
-        // Bot review header block: "[bot]" line to next blank line
+        // Bot review header block: "[bot]" line to next blank line (maxLines 30 to catch longer reviews)
         BlockPattern(
             start = Regex("^.*\\[bot]$", RegexOption.IGNORE_CASE),
-            maxLines = 10,
+            maxLines = 30,
         ),
         // CodeRabbit "Suggested fix" block
         BlockPattern(
             start = Regex("^Suggested fix$", RegexOption.IGNORE_CASE),
             end = Regex("^$"),
             maxLines = 40,
+        ),
+        // CodeRabbit summary block: "Summary by CodeRabbit" to next blank line
+        BlockPattern(
+            start = Regex("^Summary by CodeRabbit$", RegexOption.IGNORE_CASE),
+            maxLines = 40,
+        ),
+        // CodeRabbit "Walkthrough" section to next blank line
+        BlockPattern(
+            start = Regex("^Walkthrough$", RegexOption.IGNORE_CASE),
+            maxLines = 60,
+        ),
+        // CodeRabbit "Poem" section to next blank line
+        BlockPattern(
+            start = Regex("^Poem$", RegexOption.IGNORE_CASE),
+            maxLines = 20,
+        ),
+        // "Sequence Diagram(s)" section to next blank line
+        BlockPattern(
+            start = Regex("^Sequence Diagram\\(s\\)$", RegexOption.IGNORE_CASE),
+            maxLines = 60,
+        ),
+        // "Suggested change(s)" UI block: header + original/replacement to next blank line
+        BlockPattern(
+            start = Regex("^Suggested changes?$", RegexOption.IGNORE_CASE),
+            maxLines = 10,
         ),
     ),
 )
