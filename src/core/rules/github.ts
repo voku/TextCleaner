@@ -314,7 +314,7 @@ export const GitHubRuleSet: CleanupRuleSet = {
   blockPatterns: [
     // CodeRabbit review table: "Cohort / File(s)  Summary" to next blank line
     {
-      start: /^Cohort \/ File\(s\)\tSummary$/i,
+      start: /^Cohort \/ File\(s\)\s+Summary$/i,
       maxLines: 80,
     },
     // CodeRabbit "Finishing Touches" section

@@ -321,7 +321,7 @@ val GitHubRuleSet = CleanupRuleSet(
     blockPatterns = listOf(
         // CodeRabbit review table: "Cohort / File(s)  Summary" to next blank line
         BlockPattern(
-            start = Regex("^Cohort / File\\(s\\)\tSummary$", RegexOption.IGNORE_CASE),
+            start = Regex("^Cohort / File\\(s\\)\\s+Summary$", RegexOption.IGNORE_CASE),
             maxLines = 80,
         ),
         // CodeRabbit "Finishing Touches" section
