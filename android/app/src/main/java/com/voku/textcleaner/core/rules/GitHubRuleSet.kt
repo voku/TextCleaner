@@ -242,7 +242,7 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^Showing \\d+ changed files? with \\d+ additions? and \\d+ deletions?\\.$", RegexOption.IGNORE_CASE), // diff summary
         Regex("^\u00B7\\s+\\d+ comments?$", RegexOption.IGNORE_CASE),  // "· N comments" middle-dot separator
         Regex("^\u00B7$"),                                               // standalone middle-dot separator
-        Regex("^[a-zA-Z0-9][a-zA-Z0-9._-]* changed the title .*$", RegexOption.IGNORE_CASE), // issue title-change (username prefix required)
+        Regex("^[a-zA-Z0-9][a-zA-Z0-9._-]+ changed the title .*$", RegexOption.IGNORE_CASE), // issue title-change (username ≥2 chars)
         Regex("^Some comments are outside the diff and can['\u2019]t be posted inline due to platform limitations\\.$", RegexOption.IGNORE_CASE), // both apostrophe variants
         Regex("^yesterday$", RegexOption.IGNORE_CASE),                  // relative timestamp
         Regex("^last (week|month|year)$", RegexOption.IGNORE_CASE),     // relative timestamp
