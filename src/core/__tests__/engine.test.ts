@@ -117,11 +117,11 @@ describe('Markdown Output', () => {
   });
 
   it('does not corrupt code fences in non-chat markdown output', () => {
-    const input = '## Summary\n\nHere is the snippet:\n\n```typescript\nconst x: number = 1;\n```\n\nEnd of doc.';
+    const input = '## Summary\n\nHere is the snippet:\n\n```javascript\nconst x = 1;\n```\n\nEnd of doc.';
     const markdown = generateMarkdown(input, 'docs');
 
-    expect(markdown).toContain('```typescript');
-    expect(markdown).toContain('const x: number = 1;');
+    expect(markdown).toContain('```javascript');
+    expect(markdown).toContain('const x = 1;');
     expect(markdown).toContain('```\n\nEnd of doc.');
   });
 

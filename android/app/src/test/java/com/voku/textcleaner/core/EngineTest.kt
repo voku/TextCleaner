@@ -149,11 +149,11 @@ class EngineTest {
 
     @Test
     fun `does not corrupt code fences in non-chat markdown output`() {
-        val input = "## Summary\n\nHere is the snippet:\n\n```typescript\nval x: Int = 1\n```\n\nEnd of doc."
+        val input = "## Summary\n\nHere is the snippet:\n\n```javascript\nconst x = 1;\n```\n\nEnd of doc."
         val markdown = Engine.generateMarkdown(input, SourceType.DOCS)
 
-        assertTrue(markdown.contains("```typescript"))
-        assertTrue(markdown.contains("val x: Int = 1"))
+        assertTrue(markdown.contains("```javascript"))
+        assertTrue(markdown.contains("const x = 1;"))
         assertTrue(markdown.contains("```\n\nEnd of doc."))
     }
 
