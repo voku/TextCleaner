@@ -2022,6 +2022,115 @@ Do not share my personal information
         assertTrue(result.cleanedText.contains("Real content."))
     }
 
+    // ── Copilot agent / PR lifecycle events (discovered via real mobile PR paste) ─────
+
+    @Test
+    fun `removes standalone Copilot AI username line`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# PR Title\nCopilot AI\nThe actual review text follows.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Copilot AI"))
+        assertTrue(result.cleanedText.contains("The actual review text follows."))
+    }
+
+    @Test
+    fun `removes Copilot AI action lines (assigned, requested review)`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "Description",
+                    "Copilot AI assigned Copilot and voku 48 minutes ago",
+                    "Copilot AI requested a review from voku 34 minutes ago",
+                    "The actual content.",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Copilot AI assigned"))
+        assertFalse(result.cleanedText.contains("Copilot AI requested"))
+        assertTrue(result.cleanedText.contains("The actual content."))
+    }
+
+    @Test
+    fun `removes Copilot lifecycle event lines (created, started, finished)`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "Description",
+                    "Copilot created this pull request from a session on behalf of voku 48 minutes ago",
+                    "Copilot started work on behalf of voku 47 minutes ago",
+                    "Copilot finished work on behalf of voku 34 minutes ago",
+                    "The actual content.",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Copilot created this pull request"))
+        assertFalse(result.cleanedText.contains("Copilot started work"))
+        assertFalse(result.cleanedText.contains("Copilot finished work"))
+        assertTrue(result.cleanedText.contains("The actual content."))
+    }
+
+    @Test
+    fun `removes marked-as-ready-for-review and draft event lines`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "Description",
+                    "voku marked this pull request as ready for review 13 minutes ago",
+                    "alice marked this pull request as draft",
+                    "The actual content.",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("marked this pull request as ready for review"))
+        assertFalse(result.cleanedText.contains("marked this pull request as draft"))
+        assertTrue(result.cleanedText.contains("The actual content."))
+    }
+
+    @Test
+    fun `removes Review has been requested merge-info noise`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "# PR Title",
+                    "Review has been requested on this pull request. It is not required to merge. Learn more about requesting a pull request review.",
+                    "The actual description of changes.",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Review has been requested on this pull request"))
+        assertTrue(result.cleanedText.contains("The actual description of changes."))
+    }
+
+    @Test
+    fun `removes receiving notifications because you were assigned suffix variant`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = listOf(
+                    "Description",
+                    "The actual content.",
+                    "You\u2019re receiving notifications because you were assigned.",
+                    "2 participants",
+                ).joinToString("\n"),
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("receiving notifications because you were assigned"))
+        assertTrue(result.cleanedText.contains("The actual content."))
+    }
+
     // ── Golden fixture integration test ─────────────────────────────────
     // Mirrors the TypeScript golden fixture at engine.test.ts:1815+
 

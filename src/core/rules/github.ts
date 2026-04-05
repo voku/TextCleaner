@@ -44,6 +44,8 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Footer',
     '1 participant',
     'You\u2019re receiving notifications because you were mentioned.',
+    'You\u2019re receiving notifications because you were assigned.',
+    'You\u2019re receiving notifications because you are watching this repository.',
     'Customize',
     'Notifications',
     'None yet',
@@ -127,6 +129,8 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Copilot requested your review on this pull request.',
     'Copilot uses AI. Check for mistakes.',
     'Mention @copilot in a comment to make changes to this pull request.',
+    'Copilot AI',
+    'Review has been requested on this pull request. It is not required to merge. Learn more about requesting a pull request review.',
     'Read all affected files',
     'Merged',
     'Outdated',
@@ -298,6 +302,10 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^high$/i,                                              // standalone severity label
     /^critical$/i,                                          // standalone severity label
     /^informational$/i,                                     // standalone severity label
+    // Copilot agent lifecycle events
+    /^Copilot AI .+$/i,                                     // "Copilot AI assigned X and Y N ago", "Copilot AI reviewed..."
+    /^Copilot (?:created|started|finished) .+$/i,           // "Copilot created this pull request...", "Copilot started/finished work..."
+    /^.+ marked this pull request as (?:ready for review|draft).*$/i, // "user marked this pull request as ready for review"
   ],
   preserveRegexes: [
     /^#+ /, // Headings

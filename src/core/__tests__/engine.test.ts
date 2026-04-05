@@ -1908,6 +1908,91 @@ Privacy`;
     expect(nonBlankLines.length).toBeGreaterThanOrEqual(10);
   });
 
+  // ── Copilot agent / PR lifecycle events (discovered via real mobile PR paste) ─────
+
+  it('removes standalone "Copilot AI" username line', () => {
+    const result = cleanText({
+      rawText: '# PR Title\nCopilot AI\nThe actual review text follows.',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Copilot AI');
+    expect(result.cleanedText).toContain('The actual review text follows.');
+  });
+
+  it('removes Copilot AI action lines (assigned, requested review)', () => {
+    const result = cleanText({
+      rawText: [
+        'Description',
+        'Copilot AI assigned Copilot and voku 48 minutes ago',
+        'Copilot AI requested a review from voku 34 minutes ago',
+        'The actual content.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Copilot AI assigned');
+    expect(result.cleanedText).not.toContain('Copilot AI requested');
+    expect(result.cleanedText).toContain('The actual content.');
+  });
+
+  it('removes Copilot lifecycle event lines (created, started, finished)', () => {
+    const result = cleanText({
+      rawText: [
+        'Description',
+        'Copilot created this pull request from a session on behalf of voku 48 minutes ago',
+        'Copilot started work on behalf of voku 47 minutes ago',
+        'Copilot finished work on behalf of voku 34 minutes ago',
+        'The actual content.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Copilot created this pull request');
+    expect(result.cleanedText).not.toContain('Copilot started work');
+    expect(result.cleanedText).not.toContain('Copilot finished work');
+    expect(result.cleanedText).toContain('The actual content.');
+  });
+
+  it('removes "marked this pull request as ready for review" event lines', () => {
+    const result = cleanText({
+      rawText: [
+        'Description',
+        'voku marked this pull request as ready for review 13 minutes ago',
+        'alice marked this pull request as draft',
+        'The actual content.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('marked this pull request as ready for review');
+    expect(result.cleanedText).not.toContain('marked this pull request as draft');
+    expect(result.cleanedText).toContain('The actual content.');
+  });
+
+  it('removes "Review has been requested on this pull request" merge-info noise', () => {
+    const result = cleanText({
+      rawText: [
+        '# PR Title',
+        'Review has been requested on this pull request. It is not required to merge. Learn more about requesting a pull request review.',
+        'The actual description of changes.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Review has been requested on this pull request');
+    expect(result.cleanedText).toContain('The actual description of changes.');
+  });
+
+  it('removes "receiving notifications because you were assigned" suffix variant', () => {
+    const result = cleanText({
+      rawText: [
+        'Description',
+        'The actual content.',
+        "You\u2019re receiving notifications because you were assigned.",
+        '2 participants',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('receiving notifications because you were assigned');
+    expect(result.cleanedText).toContain('The actual content.');
+  });
+
   // ── Golden fixture integration test ─────────────────────────────────────
   // This is the "single most uncomfortable test" from the blind-spot analysis:
   // a real full-page PR paste, cleaned and compared to a known-good output.

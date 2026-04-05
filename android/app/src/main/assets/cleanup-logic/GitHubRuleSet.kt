@@ -51,6 +51,8 @@ val GitHubRuleSet = CleanupRuleSet(
         "Footer",
         "1 participant",
         "You\u2019re receiving notifications because you were mentioned.",
+        "You\u2019re receiving notifications because you were assigned.",
+        "You\u2019re receiving notifications because you are watching this repository.",
         "Customize",
         "Notifications",
         "None yet",
@@ -134,6 +136,8 @@ val GitHubRuleSet = CleanupRuleSet(
         "Copilot requested your review on this pull request.",
         "Copilot uses AI. Check for mistakes.",
         "Mention @copilot in a comment to make changes to this pull request.",
+        "Copilot AI",
+        "Review has been requested on this pull request. It is not required to merge. Learn more about requesting a pull request review.",
         "Read all affected files",
         "Merged",
         "Outdated",
@@ -305,6 +309,10 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^high$", RegexOption.IGNORE_CASE),                               // standalone severity label
         Regex("^critical$", RegexOption.IGNORE_CASE),                           // standalone severity label
         Regex("^informational$", RegexOption.IGNORE_CASE),                      // standalone severity label
+        // Copilot agent lifecycle events (discovered via real mobile PR page paste)
+        Regex("^Copilot AI .+$", RegexOption.IGNORE_CASE),                       // "Copilot AI assigned X and Y N ago", "Copilot AI reviewed..."
+        Regex("^Copilot (?:created|started|finished) .+$", RegexOption.IGNORE_CASE), // "Copilot created/started/finished work..."
+        Regex("^.+ marked this pull request as (?:ready for review|draft).*$", RegexOption.IGNORE_CASE), // PR state change
     ),
     preserveRegexes = listOf(
         Regex("^#+ "),                              // Headings
