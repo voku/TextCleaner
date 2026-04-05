@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cleanText, normalizeText, trimPrefix, trimSuffix, cleanMiddle, collapseBlankLines, generateMarkdown } from '../engine';
+import { cleanText, normalizeText, trimPrefix, trimSuffix, cleanMiddle, collapseBlankLines, generateMarkdown, removeBlocks } from '../engine';
 import { detectSourceType } from '../detector';
 import { GenericRuleSet } from '../rules/generic';
 import { GitHubRuleSet } from '../rules/github';
@@ -1649,5 +1649,330 @@ Privacy`;
     expect(result.cleanedText).toContain('I reviewed commits 1 through 5 in detail.');
     // The diff summary line is removed
     expect(result.cleanedText).not.toContain('Showing 3 changed files');
+  });
+
+  // ── Block-aware removal ─────────────────────────────────────────────────
+
+  it('removes a CodeRabbit review table block (Cohort → blank line)', () => {
+    const result = cleanText({
+      rawText: [
+        'Motivation',
+        'Fix the bug in auth.',
+        'Cohort / File(s)\tSummary',
+        'src/auth.ts\tFixed token refresh logic',
+        'src/api.ts\tUpdated error handling',
+        '',
+        'Description',
+        'This PR fixes token refresh.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Cohort / File(s)');
+    expect(result.cleanedText).not.toContain('Fixed token refresh logic');
+    expect(result.cleanedText).toContain('Motivation');
+    expect(result.cleanedText).toContain('Description');
+    expect(result.cleanedText).toContain('This PR fixes token refresh.');
+  });
+
+  it('removes bot review header blocks ([bot] line → blank line)', () => {
+    const result = cleanText({
+      rawText: [
+        'Description',
+        'This is the PR description.',
+        '',
+        'review-assist[bot]',
+        'review-assist bot reviewed 1 hour ago',
+        'Contributor',
+        'review-assist bot',
+        'left a comment',
+        'Code Review',
+        '',
+        'The code looks good but needs more tests.',
+        '',
+        'However, the auth module should also handle token expiry.',
+        'Consider adding a retry mechanism for failed requests.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('review-assist[bot]');
+    expect(result.cleanedText).toContain('This is the PR description.');
+    expect(result.cleanedText).toContain('The code looks good but needs more tests.');
+    expect(result.cleanedText).toContain('Consider adding a retry mechanism for failed requests.');
+  });
+
+  // ── Mid-body noise removal (blind-spot analysis findings) ───────────────
+
+  it('removes standalone severity labels (medium, low, high, critical)', () => {
+    const result = cleanText({
+      rawText: 'Description\nThis is a bug.\nmedium\nThe fix is simple.',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('medium');
+    expect(result.cleanedText).toContain('This is a bug.');
+    expect(result.cleanedText).toContain('The fix is simple.');
+  });
+
+  it('removes PR status banners and merge metadata', () => {
+    const result = cleanText({
+      rawText: [
+        'Fix authentication bug',
+        'The pull request is closed.',
+        'Caution',
+        'Review failed',
+        'Changes requested',
+        'This is the actual description.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('The pull request is closed.');
+    expect(result.cleanedText).not.toContain('Caution');
+    expect(result.cleanedText).not.toContain('Review failed');
+    expect(result.cleanedText).not.toContain('Changes requested');
+    expect(result.cleanedText).toContain('Fix authentication bug');
+    expect(result.cleanedText).toContain('This is the actual description.');
+  });
+
+  it('removes review events (approved, requested changes, dismissed)', () => {
+    const result = cleanText({
+      rawText: [
+        'Description',
+        'voku approved these changes',
+        'alice requested changes',
+        'bob dismissed stale review',
+        'The actual review comment.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('approved these changes');
+    expect(result.cleanedText).not.toContain('requested changes');
+    expect(result.cleanedText).not.toContain('dismissed stale review');
+    expect(result.cleanedText).toContain('The actual review comment.');
+  });
+
+  it('removes merge/branch lifecycle events', () => {
+    const result = cleanText({
+      rawText: [
+        '# PR Title',
+        'voku merged commit abc1234 into main',
+        'voku deleted the feature/auth branch',
+        'alice added 3 commits last month',
+        'bob force-pushed the main branch from abc1234 to def5678',
+        'The actual content.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('merged commit');
+    expect(result.cleanedText).not.toContain('deleted the');
+    expect(result.cleanedText).not.toContain('added 3 commits');
+    expect(result.cleanedText).not.toContain('force-pushed');
+    expect(result.cleanedText).toContain('# PR Title');
+    expect(result.cleanedText).toContain('The actual content.');
+  });
+
+  it('removes merge UI controls', () => {
+    const result = cleanText({
+      rawText: [
+        'Description of changes.',
+        'Squash and merge',
+        'Confirm squash and merge',
+        'This branch is up to date with the base branch.',
+        'All checks have passed',
+        'Merging is blocked',
+        'The fix addresses the auth issue.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Squash and merge');
+    expect(result.cleanedText).not.toContain('Confirm squash and merge');
+    expect(result.cleanedText).not.toContain('This branch is up to date');
+    expect(result.cleanedText).not.toContain('All checks have passed');
+    expect(result.cleanedText).not.toContain('Merging is blocked');
+    expect(result.cleanedText).toContain('Description of changes.');
+    expect(result.cleanedText).toContain('The fix addresses the auth issue.');
+  });
+
+  it('removes cross-reference events', () => {
+    const result = cleanText({
+      rawText: [
+        '# Issue',
+        'This was referenced Oct 3, 2025',
+        'alice referenced this pull request',
+        'This comment was marked as resolved',
+        'Actual discussion content.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('This was referenced');
+    expect(result.cleanedText).not.toContain('referenced this pull request');
+    expect(result.cleanedText).not.toContain('marked as resolved');
+    expect(result.cleanedText).toContain('Actual discussion content.');
+  });
+
+  // ── Golden fixture integration test ─────────────────────────────────────
+  // This is the "single most uncomfortable test" from the blind-spot analysis:
+  // a real full-page PR paste, cleaned and compared to a known-good output.
+
+  it('golden fixture: cleans a complete real PR paste to expected output', () => {
+    // Simulated full-page copy-paste of a GitHub PR (header + body + sidebar + footer)
+    const fullPagePaste = [
+      '- - - - - - - - - - - - - - - Skip to content',
+      'voku',
+      'AmysEcho',
+      'Repository navigation',
+      'Code',
+      'Issues',
+      '2',
+      '(2)',
+      'Pull requests',
+      '12',
+      '(12)',
+      'Agents',
+      'Discussions',
+      'Actions',
+      'Projects',
+      'Wiki',
+      // PR title
+      'Expose runtime diagnosability for gesture detector and surface in status/docs/tests',
+      // PR metadata
+      '#1123',
+      'Merged',
+      'voku',
+      'merged 3 commits into',
+      'main',
+      'from',
+      'codex/work-on-todos-autonomously',
+      'yesterday',
+      '+146',
+      '-16',
+      'Lines changed: 146 additions &amp; 16 deletions',
+      'Conversation6 (6)',
+      'Commits3 (3)',
+      'Checks14 (14)',
+      'Files changed9 (9)',
+      'Conversation',
+      '@voku',
+      'Owner',
+      'voku',
+      'commented',
+      '2 days ago',
+      '\u2022',
+      // PR body — the content that matters
+      'Motivation',
+      'Reduce time-to-root-cause for MediaPipe/gesture runtime incidents.',
+      '',
+      'Description',
+      'Added runtime diagnostics to GestureDetector including runtimeDelegates.',
+      '',
+      'Testing',
+      'Ran unit tests for the gesture module.',
+      '',
+      // Bot review block
+      'review-assist[bot]',
+      'review-assist bot reviewed 1 hour ago',
+      'Contributor',
+      'review-assist bot',
+      'left a comment',
+      'Code Review',
+      '',
+      'This pull request implements runtime diagnosability enhancements.',
+      '',
+      // CodeRabbit table
+      'Codex Task',
+      'Summary by CodeRabbit',
+      'Release Notes',
+      '',
+      // Inline review comment
+      'webapp/src/gesture/core/GestureDetector.ts',
+      'Outdated',
+      'Comment on lines +532 to +551',
+      '  getRuntimeDiagnostics(): {',
+      '    running: boolean;',
+      '  } {',
+      'The return type is complex and duplicated.',
+      '',
+      // Merge UI noise
+      'Caution',
+      'Review failed',
+      'The pull request is closed.',
+      'All checks have passed',
+      'Squash and merge',
+      'Confirm squash and merge',
+      '',
+      // Sidebar
+      'Reviewers',
+      '+1 more reviewer',
+      'Assignees',
+      'No one\u2014',
+      'Labels',
+      'None yet',
+      'Projects',
+      'Milestone',
+      'No milestone',
+      'Development',
+      'Successfully merging this pull request may close these issues.',
+      '',
+      // Footer
+      'Footer',
+      '\u00A9 2026 GitHub, Inc.',
+      'Footer navigation',
+      'Terms',
+      'Privacy',
+    ].join('\n');
+
+    const result = cleanText({
+      rawText: fullPagePaste,
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+
+    // ── Must be present (the meaningful content) ─────────────────────────
+    expect(result.cleanedText).toContain('Expose runtime diagnosability for gesture detector and surface in status/docs/tests');
+    expect(result.cleanedText).toContain('Motivation');
+    expect(result.cleanedText).toContain('Reduce time-to-root-cause for MediaPipe/gesture runtime incidents.');
+    expect(result.cleanedText).toContain('Description');
+    expect(result.cleanedText).toContain('Added runtime diagnostics to GestureDetector including runtimeDelegates.');
+    expect(result.cleanedText).toContain('Testing');
+    expect(result.cleanedText).toContain('Ran unit tests for the gesture module.');
+    expect(result.cleanedText).toContain('This pull request implements runtime diagnosability enhancements.');
+    // Code review comment preserved
+    expect(result.cleanedText).toContain('webapp/src/gesture/core/GestureDetector.ts');
+    expect(result.cleanedText).toContain('getRuntimeDiagnostics(): {');
+    expect(result.cleanedText).toContain('The return type is complex and duplicated.');
+
+    // ── Must NOT be present (the noise) ──────────────────────────────────
+    // Header chrome
+    expect(result.cleanedText).not.toContain('Skip to content');
+    expect(result.cleanedText).not.toContain('Repository navigation');
+    expect(result.cleanedText).not.toContain('AmysEcho');
+    // PR metadata
+    expect(result.cleanedText).not.toContain('#1123');
+    expect(result.cleanedText).not.toContain('merged 3 commits into');
+    expect(result.cleanedText).not.toContain('Lines changed: 146 additions');
+    expect(result.cleanedText).not.toContain('Conversation6 (6)');
+    // Bot review block header
+    expect(result.cleanedText).not.toContain('review-assist[bot]');
+    // CodeRabbit metadata
+    expect(result.cleanedText).not.toContain('Codex Task');
+    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).not.toContain('Release Notes');
+    // Merge UI noise
+    expect(result.cleanedText).not.toContain('Caution');
+    expect(result.cleanedText).not.toContain('Review failed');
+    expect(result.cleanedText).not.toContain('The pull request is closed.');
+    expect(result.cleanedText).not.toContain('All checks have passed');
+    expect(result.cleanedText).not.toContain('Squash and merge');
+    // Sidebar
+    expect(result.cleanedText).not.toContain('No one\u2014');
+    expect(result.cleanedText).not.toContain('No milestone');
+    // Footer
+    expect(result.cleanedText).not.toContain('Footer navigation');
+    expect(result.cleanedText).not.toContain('\u00A9 2026 GitHub, Inc.');
+    expect(result.cleanedText).not.toContain('Terms');
+
+    // ── Line count sanity check ──────────────────────────────────────────
+    // The meaningful content is approximately 15-25 lines. If cleaned output
+    // has more than 35 non-blank lines, too much noise is leaking through.
+    const nonBlankLines = result.cleanedText.split('\n').filter(l => l.trim() !== '');
+    expect(nonBlankLines.length).toBeLessThanOrEqual(35);
+    expect(nonBlankLines.length).toBeGreaterThanOrEqual(5);
   });
 });

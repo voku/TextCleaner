@@ -43,7 +43,7 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Footer navigation',
     'Footer',
     '1 participant',
-    'You’re receiving notifications because you were mentioned.',
+    'You\u2019re receiving notifications because you were mentioned.',
     'Customize',
     'Notifications',
     'None yet',
@@ -53,13 +53,13 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Milestone',
     'Projects',
     'Labels',
-    'No one—',
+    'No one\u2014',
     'Assignees',
     'Still in progress?',
     '+1 more reviewer',
     'Reviewers',
     'ProTip! Add comments to specific lines under Files changed.',
-    'ProTip! Add .patch or .diff to the end of URLs for Git’s plaintext views.',
+    'ProTip! Add .patch or .diff to the end of URLs for Git\u2019s plaintext views.',
     'Remember, contributions to this repository should follow our GitHub Community Guidelines.',
     'Add your comment here...',
     'Comment',
@@ -92,12 +92,12 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Add reaction',
     'React',
     'Rate limit exceeded',
-    '⌛ How to resolve this issue?',
-    '🚦 How do rate limits work?',
-    'ℹ️ Review info',
-    '✨ Finishing Touches',
+    '\u231B How to resolve this issue?',
+    '\uD83D\uDEA6 How do rate limits work?',
+    '\u2139\uFE0F Review info',
+    '\u2728 Finishing Touches',
     'Thanks for using CodeRabbit! It\'s free for OSS, and your support helps us grow. If you like it, consider giving us a shout-out.',
-    '❤️ Share',
+    '\u2764\uFE0F Share',
     'Comment @coderabbitai help to get the list of available commands and usage tips.',
     'This branch has not been deployed',
     'No deployments',
@@ -107,7 +107,7 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'skipped checks',
     'neutral checks',
     'successful checks',
-    '•',
+    '\u2022',
     'left a comment',
     'Code Review',
     'Walkthrough',
@@ -115,10 +115,10 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Cohort / File(s)\tSummary',
     'Estimated code review effort',
     'Possibly related PRs',
-    '💡 Codex Review',
+    '\uD83D\uDCA1 Codex Review',
     'Here are some automated review suggestions for this pull request.',
-    'ℹ️ About Codex in GitHub',
-    '🤖 Prompt for all review comments with AI agents',
+    '\u2139\uFE0F About Codex in GitHub',
+    '\uD83E\uDD16 Prompt for all review comments with AI agents',
     'Owner',
     'commented',
     'Contributor',
@@ -178,6 +178,40 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Sign up for GitHub',
     'Already on GitHub? Sign in to your account',
     'Pick a username',
+    // Mid-body noise (blind-spot analysis: merge metadata, status banners, review states)
+    'Caution',
+    'Review failed',
+    'The pull request is closed.',
+    'The pull request is closed',
+    'This pull request is closed.',
+    'This pull request is closed',
+    'Open',
+    'Closed',
+    'Draft',
+    'Suggested change',
+    'Suggested changes',
+    'Show resolved',
+    'Hide resolved',
+    'Resolve conversation',
+    'Unresolve conversation',
+    'Approved',
+    'Changes requested',
+    'Dismissed',
+    'Pending',
+    'Review required',
+    'All checks have passed',
+    'All checks have failed',
+    'Some checks haven\u2019t completed yet',
+    'Merging is blocked',
+    'This branch has no conflicts with the base branch',
+    'This branch is out-of-date with the base branch',
+    'Rebase and merge',
+    'Squash and merge',
+    'Create a merge commit',
+    'Confirm merge',
+    'Confirm squash and merge',
+    'Confirm rebase and merge',
+    'This branch is up to date with the base branch.',
   ],
   removeAnywhereContains: [],
   removeAnywhereRegexes: [
@@ -198,7 +232,7 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^.*Skipped \d+ (minutes|hours|days) ago.*$/i,
     /^Code scanning results \/ CodeQL.*$/i,
     /^CodeQL \/ Analyze.*$/i,
-    /^CodeRabbit — Review.*$/i,
+    /^CodeRabbit \S+ Review.*$/i,
     /^Mend Security Check.*$/i,
     /^Conversation\d+ \(\d+\)$/i,
     /^Commits\d+ \(\d+\)$/i,
@@ -211,41 +245,59 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^.* wants to merge \d+ commits? into .*$/i,
     /^Reviewed commit: [a-f0-9]+$/i,
     /^Comment on lines \+\d+ to \+?\d+$/i,
-    /^⚠️ Outside diff range comments \(\d+\)$/i,
+    /^\u26A0\uFE0F Outside diff range comments \(\d+\)$/i,
     /^DGS Integration Tests \/ .*$/i,
     /^\d+ (minute|hour|day|month|year)s? ago$/i,
     /^.* reviewed \d+ (minute|hour|day|month|year)s? ago$/i,
     /^.*\[bot\]$/i,
     /^.* bot$/i,
-    /^Useful\? React with 👍 \/ 👎\.$/i,
+    /^Useful\? React with \uD83D\uDC4D \/ \uD83D\uDC4E\.$/i,
     /^Reply\.\.\.$/i,
     /^@.+\s+Reply\.\.\.$/i,
     /^\+\d+$/,
     /^-\d+$/,
     /^\d+ participants?$/i,
     // Discovered via static analysis of real PR samples
-    /^🚥 Pre-merge checks.*$/,                   // pre-merge checks summary line
-    /^🎯 \d+.*⏱️.*$/,                           // CodeRabbit review effort value
-    /^🤖 Hi @.+/i,                               // GitHub Actions bot acknowledgment
-    /^@.+Reply\.\.\.$/i,                          // tab-less "Reply..." button variant
-    /^P[0-9] Badge .+/i,                          // Codex/review priority badge lines
-    /^@[a-zA-Z0-9][a-zA-Z0-9._-]*$/i,            // standalone @handle lines (nav chrome)
-    /^(?:[a-f0-9]{7}|[a-f0-9]{40})$/,           // short (7) and full (40) commit SHAs only
+    /^\uD83D\uDEA5 Pre-merge checks.*$/,                   // pre-merge checks summary line
+    /^\uD83C\uDFAF \d+.*\u23F1\uFE0F.*$/,                 // CodeRabbit review effort value
+    /^\uD83E\uDD16 Hi @.+/i,                               // GitHub Actions bot acknowledgment
+    /^@.+Reply\.\.\.$/i,                                    // tab-less "Reply..." button variant
+    /^P[0-9] Badge .+/i,                                    // Codex/review priority badge lines
+    /^@[a-zA-Z0-9][a-zA-Z0-9._-]*$/i,                      // standalone @handle lines (nav chrome)
+    /^(?:[a-f0-9]{7}|[a-f0-9]{40})$/,                     // short (7) and full (40) commit SHAs only
     // Discovered via analysis of GitHub Issue, Repo, and Files Changed pages
-    /^Used by \d+( users?)?$/i,                   // GitHub repo sidebar stat
-    /^\d+ contributors?$/i,                       // GitHub repo contributors count
-    /^Commits \d+$/i,                             // Files Changed tab bar (space format)
-    /^Checks \d+$/i,                              // Files Changed tab bar (space format)
-    /^Files changed \d+$/i,                       // Files Changed tab bar (space format)
+    /^Used by \d+( users?)?$/i,                             // GitHub repo sidebar stat
+    /^\d+ contributors?$/i,                                 // GitHub repo contributors count
+    /^Commits \d+$/i,                                       // Files Changed tab bar (space format)
+    /^Checks \d+$/i,                                        // Files Changed tab bar (space format)
+    /^Files changed \d+$/i,                                 // Files Changed tab bar (space format)
     /^Showing \d+ changed files? with \d+ additions? and \d+ deletions?\.$/i, // diff summary
-    /^\u00B7\s+\d+ comments?$/i,                  // "· N comments" middle-dot separator (U+00B7)
-    /^\u00B7$/,                                    // standalone middle-dot separator
-    /^[a-zA-Z0-9][a-zA-Z0-9._-]* changed the title .*$/i, // GitHub issue title-change event (username ≥1 char)
-    /^Some comments are outside the diff and can[''\u2019]t be posted inline due to platform limitations\.$/i, // platform note (both apostrophe variants)
-    /^yesterday$/i,                               // relative timestamp not covered by existing rule
-    /^last (week|month|year)$/i,                  // relative timestamp
-    /^(a|an) (minute|hour|day|week|month|year) ago$/i, // singular relative timestamp
-    /^\d+% of \d+ files? viewed$/i,              // Files Changed "N% of N files viewed" progress
+    /^\u00B7\s+\d+ comments?$/i,                            // middle-dot separator (U+00B7)
+    /^\u00B7$/,                                              // standalone middle-dot separator
+    /^[a-zA-Z0-9][a-zA-Z0-9._-]* changed the title .*$/i,  // issue title-change event
+    /^Some comments are outside the diff and can['\u2019]t be posted inline due to platform limitations\.$/i,
+    /^yesterday$/i,                                         // relative timestamp
+    /^last (week|month|year)$/i,                            // relative timestamp
+    /^(a|an) (minute|hour|day|week|month|year) ago$/i,     // singular relative timestamp
+    /^\d+% of \d+ files? viewed$/i,                        // Files Changed progress indicator
+    // Mid-body noise (blind-spot analysis: merge events, review events, severity labels)
+    /^.* approved these changes$/i,                         // "username approved these changes"
+    /^.* dismissed .* review$/i,                            // "username dismissed someone's review"
+    /^.* requested changes$/i,                              // "username requested changes"
+    /^.* merged commit [a-f0-9]+ into .*$/i,               // "user merged commit abc123 into main"
+    /^.* deleted the .* branch$/i,                          // "user deleted the feature branch"
+    /^.* added \d+ commits? .*$/i,                          // "user added 3 commits month ago"
+    /^.* force-pushed the .* branch from .* to .*$/i,      // force-push event
+    /^\d+ checks? (passed|failed|pending|skipped)$/i,      // "3 checks passed"
+    /^This was referenced .*$/i,                            // "This was referenced Oct 3"
+    /^.* referenced this .*$/i,                             // "user referenced this pull request"
+    /^This comment was marked as .*$/i,                     // "This comment was marked as resolved"
+    /^Suggested fix$/i,                                     // CodeRabbit suggested fix header
+    /^medium$/i,                                            // standalone severity label
+    /^low$/i,                                               // standalone severity label
+    /^high$/i,                                              // standalone severity label
+    /^critical$/i,                                          // standalone severity label
+    /^informational$/i,                                     // standalone severity label
   ],
   preserveRegexes: [
     /^#+ /, // Headings
@@ -257,5 +309,30 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^\+ /, // Diff additions
     /^- /, // Diff deletions
     /^@@ .* @@/, // Diff headers
+  ],
+  // Block-aware removal: detect and remove multi-line structural sections
+  blockPatterns: [
+    // CodeRabbit review table: "Cohort / File(s)  Summary" to next blank line
+    {
+      start: /^Cohort \/ File\(s\)\tSummary$/i,
+      maxLines: 80,
+    },
+    // CodeRabbit "Finishing Touches" section
+    {
+      start: /^\u2728 Finishing Touches$/i,
+      end: /^$/,
+      maxLines: 30,
+    },
+    // Bot review header block: "[bot]" line to next blank line
+    {
+      start: /^.*\[bot\]$/i,
+      maxLines: 10,
+    },
+    // CodeRabbit "Suggested fix" block
+    {
+      start: /^Suggested fix$/i,
+      end: /^$/,
+      maxLines: 40,
+    },
   ],
 };
