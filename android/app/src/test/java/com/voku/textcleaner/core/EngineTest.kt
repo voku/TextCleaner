@@ -1364,4 +1364,263 @@ Do not share my personal information
         assertFalse(result.cleanedText.contains("Comment on lines +532 to +551"))
         assertTrue(result.cleanedText.contains("Some content"))
     }
+
+    // ── GitHub — Research-Driven Pattern Coverage ─────────────────────────
+
+    @Test
+    fun `removes Type slash to search shortcut hint`() {
+        val result = Engine.cleanText(RawInput(rawText = "Type '/' to search\n# PR title\nSome content"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Type '/' to search"))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes Jump to bottom page navigation`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Issue title\nSome content\nJump to bottom"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Jump to bottom"))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes opened this issue event line`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Issue\ndevuser\nopened this issue\nSome content"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("opened this issue"))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes Leave a comment form label`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Issue\nSome content\nLeave a comment"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Leave a comment"))
+    }
+
+    @Test
+    fun `removes Lock conversation and Delete issue sidebar actions`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Issue\nSome content\nLock conversation\nDelete issue"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Lock conversation"))
+        assertFalse(result.cleanedText.contains("Delete issue"))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes Linked pull requests sidebar section`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Issue\nSome content\nLinked pull requests"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Linked pull requests"))
+    }
+
+    @Test
+    fun `removes Markdown is supported and file attach hint`() {
+        val result = Engine.cleanText(
+            RawInput(rawText = "# Issue\nSome content\nMarkdown is supported\nAttach files by dragging & dropping, selecting or pasting them."),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Markdown is supported"))
+        assertFalse(result.cleanedText.contains("Attach files by dragging & dropping"))
+    }
+
+    @Test
+    fun `removes Add a comment to start a discussion empty state`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Issue\nSome content\nAdd a comment to start a discussion"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Add a comment to start a discussion"))
+    }
+
+    @Test
+    fun `removes You are not currently watching this repository`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Issue\nSome content\nYou are not currently watching this repository"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("You are not currently watching this repository"))
+    }
+
+    @Test
+    fun `removes You must be logged in to vote`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Issue\nSome content\nYou must be logged in to vote"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("You must be logged in to vote"))
+    }
+
+    @Test
+    fun `removes No issues match the current filter empty state`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Issues\nFilters\nNo issues match the current filter"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("No issues match the current filter"))
+    }
+
+    @Test
+    fun `removes No branches or tags empty state`() {
+        val result = Engine.cleanText(RawInput(rawText = "# PR\nSome content\nDevelopment\nNo branches or tags"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("No branches or tags"))
+    }
+
+    @Test
+    fun `removes Sponsor this project sidebar link`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Repo\nSome content\nSponsor this project"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Sponsor this project"))
+    }
+
+    @Test
+    fun `removes No packages published sidebar empty state`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Repo\nSome content\nPackages\nNo packages published"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("No packages published"))
+    }
+
+    @Test
+    fun `removes Open in github dot dev and Open with GitHub Desktop buttons`() {
+        val result = Engine.cleanText(
+            RawInput(rawText = "# Repo\nSome content\nOpen in github.dev\nOpen with GitHub Desktop\nView all files"),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Open in github.dev"))
+        assertFalse(result.cleanedText.contains("Open with GitHub Desktop"))
+        assertFalse(result.cleanedText.contains("View all files"))
+    }
+
+    @Test
+    fun `removes View all releases sidebar link`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Repo\nSome content\nView all releases"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("View all releases"))
+    }
+
+    @Test
+    fun `removes Nothing to show empty state`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Repo\nSome content\nNothing to show"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Nothing to show"))
+    }
+
+    @Test
+    fun `removes Used by N users sidebar stat`() {
+        val r1 = Engine.cleanText(RawInput(rawText = "# Repo\nSome content\nUsed by 47 users"), ruleSetOverride = GitHubRuleSet)
+        val r2 = Engine.cleanText(RawInput(rawText = "# Repo\nSome content\nUsed by 3"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(r1.cleanedText.contains("Used by 47 users"))
+        assertFalse(r2.cleanedText.contains("Used by 3"))
+        assertTrue(r1.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes N contributors sidebar stat`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Repo\nSome content\n3 contributors\n1 contributor"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("3 contributors"))
+        assertFalse(result.cleanedText.contains("1 contributor"))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes Conversations plural tab label`() {
+        val result = Engine.cleanText(RawInput(rawText = "# PR\nConversations\nSome content"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Conversations"))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes Files Changed tab bar space-separated format`() {
+        val result = Engine.cleanText(
+            RawInput(rawText = "# PR\nCommits 1\nChecks 24\nFiles changed 3\nSome content"),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Commits 1"))
+        assertFalse(result.cleanedText.contains("Checks 24"))
+        assertFalse(result.cleanedText.contains("Files changed 3"))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes Showing N changed files diff summary`() {
+        val r1 = Engine.cleanText(RawInput(rawText = "# PR\nShowing 3 changed files with 200 additions and 8 deletions.\nSome content"), ruleSetOverride = GitHubRuleSet)
+        val r2 = Engine.cleanText(RawInput(rawText = "# PR\nShowing 1 changed file with 1 addition and 0 deletions.\nSome content"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(r1.cleanedText.contains("Showing 3 changed files"))
+        assertFalse(r2.cleanedText.contains("Showing 1 changed file"))
+        assertTrue(r1.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes Files Changed UI controls`() {
+        val result = Engine.cleanText(
+            RawInput(rawText = "# PR\nFilter changed files\nShow file tree\nHide file tree\nExpand all\nCollapse all\nJump to file\nLoad diff\nSome content"),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Filter changed files"))
+        assertFalse(result.cleanedText.contains("Show file tree"))
+        assertFalse(result.cleanedText.contains("Hide file tree"))
+        assertFalse(result.cleanedText.contains("Expand all"))
+        assertFalse(result.cleanedText.contains("Collapse all"))
+        assertFalse(result.cleanedText.contains("Jump to file"))
+        assertFalse(result.cleanedText.contains("Load diff"))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes Viewed checkbox label and This file was deleted diff note`() {
+        val result = Engine.cleanText(RawInput(rawText = "# PR\nSome content\nViewed\nThis file was deleted."), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Viewed"))
+        assertFalse(result.cleanedText.contains("This file was deleted."))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes N percent of N files viewed progress indicator`() {
+        val result = Engine.cleanText(RawInput(rawText = "# PR\nSome content\n50% of 6 files viewed"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("50% of 6 files viewed"))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes relative timestamps not covered by digit-based rule`() {
+        val result = Engine.cleanText(
+            RawInput(rawText = "# PR\nSome content\nyesterday\nlast week\nlast month\nlast year\na minute ago\nan hour ago\na day ago"),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("yesterday"))
+        assertFalse(result.cleanedText.contains("last week"))
+        assertFalse(result.cleanedText.contains("last month"))
+        assertFalse(result.cleanedText.contains("last year"))
+        assertFalse(result.cleanedText.contains("a minute ago"))
+        assertFalse(result.cleanedText.contains("an hour ago"))
+        assertFalse(result.cleanedText.contains("a day ago"))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes middle-dot separator N comments line`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Issue\n\u00B7 3 comments\nSome content"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("\u00B7 3 comments"))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes standalone middle-dot separator`() {
+        val result = Engine.cleanText(RawInput(rawText = "# Issue\ndevuser\n\u00B7\nedited\nSome content"), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.lines().any { it == "\u00B7" })
+    }
+
+    @Test
+    fun `removes title-change event lines`() {
+        val result = Engine.cleanText(
+            RawInput(rawText = "# Issue\ndevuser changed the title Old title New title\nSome content"),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("changed the title"))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes GitHub sign-in prompts`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# Issues\nHave a question about this project? Sign up for a free GitHub account to open an issue and contact its maintainers and the community.\nSign up for GitHub\nAlready on GitHub? Sign in to your account\nPick a username\nSome content",
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Have a question about this project?"))
+        assertFalse(result.cleanedText.contains("Sign up for GitHub"))
+        assertFalse(result.cleanedText.contains("Already on GitHub?"))
+        assertFalse(result.cleanedText.contains("Pick a username"))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `preserves real content lines that look like stat lines`() {
+        val result = Engine.cleanText(
+            RawInput(rawText = "# PR\nCommits 1\nI reviewed commits 1 through 5 in detail.\nShowing 3 changed files with 200 additions and 8 deletions."),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.lines().any { it == "Commits 1" })
+        assertTrue(result.cleanedText.contains("I reviewed commits 1 through 5 in detail."))
+        assertFalse(result.cleanedText.contains("Showing 3 changed files"))
+    }
 }

@@ -136,6 +136,7 @@ val GitHubRuleSet = CleanupRuleSet(
         "Read all affected files",
         // Discovered via static analysis of real PR samples
         "Conversation",
+        "Conversations",
         "Codex Task",
         "Summary by CodeRabbit",
         "Sequence Diagram(s)",
@@ -144,6 +145,45 @@ val GitHubRuleSet = CleanupRuleSet(
         "Some comments are outside the diff and can't be posted inline due to platform limitations.",
         "CodeRabbit",
         "Release Notes",
+        // Discovered via analysis of GitHub Issue, Repo, and Files Changed pages
+        "Type '/' to search",
+        "Sponsor this project",
+        "No packages published",
+        "Open in github.dev",
+        "Open with GitHub Desktop",
+        "View all files",
+        "View all releases",
+        "Nothing to show",
+        // Files Changed tab UI chrome
+        "Filter changed files",
+        "Show file tree",
+        "Hide file tree",
+        "Expand all",
+        "Collapse all",
+        "Jump to file",
+        "Load diff",
+        "Viewed",
+        "This file was deleted.",
+        // Issue / PR page chrome
+        "Jump to bottom",
+        "opened this issue",
+        "Leave a comment",
+        "Lock conversation",
+        "Delete issue",
+        "Linked pull requests",
+        "Markdown is supported",
+        "Attach files by dragging & dropping, selecting or pasting them.",
+        "Add a comment to start a discussion",
+        "You are not currently watching this repository",
+        "You must be logged in to vote",
+        "No issues match the current filter",
+        "No branches or tags",
+        "Label issues and pull requests for new contributors",
+        // GitHub sign-in / auth prompts
+        "Have a question about this project? Sign up for a free GitHub account to open an issue and contact its maintainers and the community.",
+        "Sign up for GitHub",
+        "Already on GitHub? Sign in to your account",
+        "Pick a username",
     ),
     removeAnywhereContains = emptyList(),
     removeAnywhereRegexes = listOf(
@@ -195,6 +235,20 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^P[0-9] Badge .+", RegexOption.IGNORE_CASE),      // Codex/review priority badge lines
         Regex("^@[a-zA-Z0-9][a-zA-Z0-9._-]*$", RegexOption.IGNORE_CASE), // standalone @handle lines
         Regex("^[a-f0-9]{7,40}$"),                               // short and full commit SHAs
+        // Discovered via analysis of GitHub Issue, Repo, and Files Changed pages
+        Regex("^Used by \\d+( users?)?$", RegexOption.IGNORE_CASE),    // GitHub repo sidebar stat
+        Regex("^\\d+ contributors?$", RegexOption.IGNORE_CASE),         // GitHub contributors count
+        Regex("^Commits \\d+$", RegexOption.IGNORE_CASE),               // Files Changed tab bar (space format)
+        Regex("^Checks \\d+$", RegexOption.IGNORE_CASE),                // Files Changed tab bar (space format)
+        Regex("^Files changed \\d+$", RegexOption.IGNORE_CASE),         // Files Changed tab bar (space format)
+        Regex("^Showing \\d+ changed files? with \\d+ additions? and \\d+ deletions?\\.$", RegexOption.IGNORE_CASE), // diff summary
+        Regex("^\u00B7\\s+\\d+ comments?$", RegexOption.IGNORE_CASE),  // "· N comments" middle-dot separator
+        Regex("^\u00B7$"),                                               // standalone middle-dot separator
+        Regex("^.* changed the title .*$", RegexOption.IGNORE_CASE),    // GitHub issue title-change event
+        Regex("^yesterday$", RegexOption.IGNORE_CASE),                  // relative timestamp
+        Regex("^last (week|month|year)$", RegexOption.IGNORE_CASE),     // relative timestamp
+        Regex("^(a|an) (minute|hour|day|week|month|year) ago$", RegexOption.IGNORE_CASE), // singular relative timestamp
+        Regex("^\\d+% of \\d+ files? viewed$", RegexOption.IGNORE_CASE), // Files Changed progress indicator
     ),
     preserveRegexes = listOf(
         Regex("^#+ "),                              // Headings

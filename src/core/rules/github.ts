@@ -130,6 +130,7 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Read all affected files',
     // Discovered via static analysis of real PR samples
     'Conversation',
+    'Conversations',
     'Codex Task',
     'Summary by CodeRabbit',
     'Sequence Diagram(s)',
@@ -138,6 +139,45 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Some comments are outside the diff and can\u2019t be posted inline due to platform limitations.',
     'CodeRabbit',
     'Release Notes',
+    // Discovered via analysis of GitHub Issue, Repo, and Files Changed pages
+    'Type \'/\' to search',
+    'Sponsor this project',
+    'No packages published',
+    'Open in github.dev',
+    'Open with GitHub Desktop',
+    'View all files',
+    'View all releases',
+    'Nothing to show',
+    // Files Changed tab UI chrome
+    'Filter changed files',
+    'Show file tree',
+    'Hide file tree',
+    'Expand all',
+    'Collapse all',
+    'Jump to file',
+    'Load diff',
+    'Viewed',
+    'This file was deleted.',
+    // Issue / PR page chrome
+    'Jump to bottom',
+    'opened this issue',
+    'Leave a comment',
+    'Lock conversation',
+    'Delete issue',
+    'Linked pull requests',
+    'Markdown is supported',
+    'Attach files by dragging & dropping, selecting or pasting them.',
+    'Add a comment to start a discussion',
+    'You are not currently watching this repository',
+    'You must be logged in to vote',
+    'No issues match the current filter',
+    'No branches or tags',
+    'Label issues and pull requests for new contributors',
+    // GitHub sign-in / auth prompts
+    'Have a question about this project? Sign up for a free GitHub account to open an issue and contact its maintainers and the community.',
+    'Sign up for GitHub',
+    'Already on GitHub? Sign in to your account',
+    'Pick a username',
   ],
   removeAnywhereContains: [],
   removeAnywhereRegexes: [
@@ -189,6 +229,20 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^P[0-9] Badge .+/i,                          // Codex/review priority badge lines
     /^@[a-zA-Z0-9][a-zA-Z0-9._-]*$/i,            // standalone @handle lines (nav chrome)
     /^[a-f0-9]{7,40}$/,                           // short and full commit SHAs
+    // Discovered via analysis of GitHub Issue, Repo, and Files Changed pages
+    /^Used by \d+( users?)?$/i,                   // GitHub repo sidebar stat
+    /^\d+ contributors?$/i,                       // GitHub repo contributors count
+    /^Commits \d+$/i,                             // Files Changed tab bar (space format)
+    /^Checks \d+$/i,                              // Files Changed tab bar (space format)
+    /^Files changed \d+$/i,                       // Files Changed tab bar (space format)
+    /^Showing \d+ changed files? with \d+ additions? and \d+ deletions?\.$/i, // diff summary
+    /^\u00B7\s+\d+ comments?$/i,                  // "· N comments" middle-dot separator (U+00B7)
+    /^\u00B7$/,                                    // standalone middle-dot separator
+    /^.* changed the title .*$/i,                 // GitHub issue title-change event
+    /^yesterday$/i,                               // relative timestamp not covered by existing rule
+    /^last (week|month|year)$/i,                  // relative timestamp
+    /^(a|an) (minute|hour|day|week|month|year) ago$/i, // singular relative timestamp
+    /^\d+% of \d+ files? viewed$/i,              // Files Changed "N% of N files viewed" progress
   ],
   preserveRegexes: [
     /^#+ /, // Headings

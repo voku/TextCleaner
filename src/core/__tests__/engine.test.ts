@@ -1306,3 +1306,249 @@ describe('GitHub PR — Static Analysis Pattern Coverage', () => {
     expect(result.cleanedText).toContain('Some content');
   });
 });
+
+describe('GitHub — Research-Driven Pattern Coverage', () => {
+  // Tests derived from real GitHub Issue, Repo, and Files Changed tab page dumps.
+  // Patterns confirmed by fetching live GitHub pages and running line-by-line analysis.
+
+  // ── Issue / PR page chrome ─────────────────────────────────────────────
+
+  it('removes "Type \'/\' to search" shortcut hint', () => {
+    const result = cleanText({ rawText: "Type '/' to search\n# PR title\nSome content" }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain("Type '/' to search");
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes "Jump to bottom" page navigation', () => {
+    const result = cleanText({ rawText: '# Issue title\nSome content\nJump to bottom' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Jump to bottom');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes "opened this issue" event line', () => {
+    const result = cleanText({ rawText: '# Issue\ndevuser\nopened this issue\nSome content' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('opened this issue');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes "Leave a comment" form label', () => {
+    const result = cleanText({ rawText: '# Issue\nSome content\nLeave a comment' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Leave a comment');
+  });
+
+  it('removes "Lock conversation" and "Delete issue" sidebar actions', () => {
+    const result = cleanText({ rawText: '# Issue\nSome content\nLock conversation\nDelete issue' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Lock conversation');
+    expect(result.cleanedText).not.toContain('Delete issue');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes "Linked pull requests" sidebar section', () => {
+    const result = cleanText({ rawText: '# Issue\nSome content\nLinked pull requests' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Linked pull requests');
+  });
+
+  it('removes "Markdown is supported" and file attach hint', () => {
+    const result = cleanText({
+      rawText: '# Issue\nSome content\nMarkdown is supported\nAttach files by dragging & dropping, selecting or pasting them.',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Markdown is supported');
+    expect(result.cleanedText).not.toContain('Attach files by dragging & dropping');
+  });
+
+  it('removes "Add a comment to start a discussion" empty state', () => {
+    const result = cleanText({ rawText: '# Issue\nSome content\nAdd a comment to start a discussion' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Add a comment to start a discussion');
+  });
+
+  it('removes "You are not currently watching this repository"', () => {
+    const result = cleanText({ rawText: '# Issue\nSome content\nYou are not currently watching this repository' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('You are not currently watching this repository');
+  });
+
+  it('removes "You must be logged in to vote"', () => {
+    const result = cleanText({ rawText: '# Issue\nSome content\nYou must be logged in to vote' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('You must be logged in to vote');
+  });
+
+  it('removes "No issues match the current filter" empty state', () => {
+    const result = cleanText({ rawText: '# Issue list\nFilters\nNo issues match the current filter' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('No issues match the current filter');
+  });
+
+  it('removes "No branches or tags" empty state', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\nDevelopment\nNo branches or tags' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('No branches or tags');
+  });
+
+  it('removes "Label issues and pull requests for new contributors"', () => {
+    const result = cleanText({ rawText: '# Issues\nLabel issues and pull requests for new contributors\nSome content' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Label issues and pull requests for new contributors');
+  });
+
+  // ── Repo sidebar chrome ────────────────────────────────────────────────
+
+  it('removes "Sponsor this project" sidebar link', () => {
+    const result = cleanText({ rawText: '# Repo\nSome content\nSponsor this project' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Sponsor this project');
+  });
+
+  it('removes "No packages published" sidebar empty state', () => {
+    const result = cleanText({ rawText: '# Repo\nSome content\nPackages\nNo packages published' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('No packages published');
+  });
+
+  it('removes "Open in github.dev" and "Open with GitHub Desktop" buttons', () => {
+    const result = cleanText({ rawText: '# Repo\nSome content\nOpen in github.dev\nOpen with GitHub Desktop\nView all files' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Open in github.dev');
+    expect(result.cleanedText).not.toContain('Open with GitHub Desktop');
+    expect(result.cleanedText).not.toContain('View all files');
+  });
+
+  it('removes "View all releases" sidebar link', () => {
+    const result = cleanText({ rawText: '# Repo\nSome content\nView all releases' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('View all releases');
+  });
+
+  it('removes "Nothing to show" empty state', () => {
+    const result = cleanText({ rawText: '# Repo\nSome content\nNothing to show' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Nothing to show');
+  });
+
+  it('removes "Used by N users" sidebar stat', () => {
+    const r1 = cleanText({ rawText: '# Repo\nSome content\nUsed by 47 users' }, GitHubRuleSet);
+    const r2 = cleanText({ rawText: '# Repo\nSome content\nUsed by 3' }, GitHubRuleSet);
+    expect(r1.cleanedText).not.toContain('Used by 47 users');
+    expect(r2.cleanedText).not.toContain('Used by 3');
+    expect(r1.cleanedText).toContain('Some content');
+  });
+
+  it('removes "N contributors" sidebar stat', () => {
+    const result = cleanText({ rawText: '# Repo\nSome content\n3 contributors\n1 contributor' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('3 contributors');
+    expect(result.cleanedText).not.toContain('1 contributor');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  // ── Files Changed tab chrome ───────────────────────────────────────────
+
+  it('removes "Conversations" plural tab label', () => {
+    const result = cleanText({ rawText: '# PR\nConversations\nSome content' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Conversations');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes Files Changed tab bar (space-separated format)', () => {
+    const result = cleanText({
+      rawText: '# PR\nCommits 1\nChecks 24\nFiles changed 3\nSome content',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Commits 1');
+    expect(result.cleanedText).not.toContain('Checks 24');
+    expect(result.cleanedText).not.toContain('Files changed 3');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes "Showing N changed files with N additions and N deletions." diff summary', () => {
+    const r1 = cleanText({ rawText: '# PR\nShowing 3 changed files with 200 additions and 8 deletions.\nSome content' }, GitHubRuleSet);
+    const r2 = cleanText({ rawText: '# PR\nShowing 1 changed file with 1 addition and 0 deletions.\nSome content' }, GitHubRuleSet);
+    expect(r1.cleanedText).not.toContain('Showing 3 changed files');
+    expect(r2.cleanedText).not.toContain('Showing 1 changed file');
+    expect(r1.cleanedText).toContain('Some content');
+  });
+
+  it('removes Files Changed UI controls', () => {
+    const result = cleanText({
+      rawText: '# PR\nFilter changed files\nShow file tree\nHide file tree\nExpand all\nCollapse all\nJump to file\nLoad diff\nSome content',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Filter changed files');
+    expect(result.cleanedText).not.toContain('Show file tree');
+    expect(result.cleanedText).not.toContain('Hide file tree');
+    expect(result.cleanedText).not.toContain('Expand all');
+    expect(result.cleanedText).not.toContain('Collapse all');
+    expect(result.cleanedText).not.toContain('Jump to file');
+    expect(result.cleanedText).not.toContain('Load diff');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes "Viewed" checkbox label and "This file was deleted." diff note', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\nViewed\nThis file was deleted.' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Viewed');
+    expect(result.cleanedText).not.toContain('This file was deleted.');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes "N% of N files viewed" Files Changed progress indicator', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\n50% of 6 files viewed' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('50% of 6 files viewed');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  // ── Relative timestamp completeness ────────────────────────────────────
+
+  it('removes relative timestamps not covered by the digit-based rule', () => {
+    const result = cleanText({
+      rawText: '# PR\nSome content\nyesterday\nlast week\nlast month\nlast year\na minute ago\nan hour ago\na day ago',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('yesterday');
+    expect(result.cleanedText).not.toContain('last week');
+    expect(result.cleanedText).not.toContain('last month');
+    expect(result.cleanedText).not.toContain('last year');
+    expect(result.cleanedText).not.toContain('a minute ago');
+    expect(result.cleanedText).not.toContain('an hour ago');
+    expect(result.cleanedText).not.toContain('a day ago');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  // ── Middle-dot separator (U+00B7) ──────────────────────────────────────
+
+  it('removes "· N comments" middle-dot separator line', () => {
+    const result = cleanText({ rawText: '# Issue\n\u00B7 3 comments\nSome content' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('\u00B7 3 comments');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes standalone middle-dot separator (U+00B7)', () => {
+    const result = cleanText({ rawText: '# Issue\ndevuser\n\u00B7\nedited\nSome content' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('\u00B7');
+  });
+
+  // ── Issue title-change event ────────────────────────────────────────────
+
+  it('removes title-change event lines', () => {
+    const result = cleanText({
+      rawText: '# Issue\ndevuser changed the title Old title New title\nSome content',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('changed the title');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  // ── GitHub auth / sign-in prompts ──────────────────────────────────────
+
+  it('removes GitHub sign-in prompts', () => {
+    const result = cleanText({
+      rawText: '# Issues\nHave a question about this project? Sign up for a free GitHub account to open an issue and contact its maintainers and the community.\nSign up for GitHub\nAlready on GitHub? Sign in to your account\nPick a username\nSome content',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Have a question about this project?');
+    expect(result.cleanedText).not.toContain('Sign up for GitHub');
+    expect(result.cleanedText).not.toContain('Already on GitHub?');
+    expect(result.cleanedText).not.toContain('Pick a username');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  // ── Preservation guards (no false positives) ───────────────────────────
+
+  it('preserves real diff content even when it looks like a stat line', () => {
+    // A line "Commits 1" in a PR diff context should be removed — but if
+    // the engineer writes "I reviewed Commits 1 through 5", that full sentence
+    // is never a standalone line and is preserved by the engine.
+    const result = cleanText({
+      rawText: '# PR\nCommits 1\nI reviewed commits 1 through 5 in detail.\nShowing 3 changed files with 200 additions and 8 deletions.',
+    }, GitHubRuleSet);
+    // The standalone "Commits 1" line is removed
+    expect(result.cleanedText.split('\n')).not.toContain('Commits 1');
+    // The sentence remains
+    expect(result.cleanedText).toContain('I reviewed commits 1 through 5 in detail.');
+    // The diff summary line is removed
+    expect(result.cleanedText).not.toContain('Showing 3 changed files');
+  });
+});
