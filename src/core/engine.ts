@@ -187,10 +187,20 @@ function formatSourceTypeLabel(type: SourceType): string {
 
 function normalizeMarkdownBody(lines: string[], type: SourceType): string[] {
   if (type === 'chat') {
+    let inCodeBlock = false;
     return lines.map(line => {
       const trimmed = line.trim();
       if (!trimmed) {
         return '';
+      }
+
+      if (trimmed.startsWith('```')) {
+        inCodeBlock = !inCodeBlock;
+        return trimmed;
+      }
+
+      if (inCodeBlock) {
+        return trimmed;
       }
 
       if (

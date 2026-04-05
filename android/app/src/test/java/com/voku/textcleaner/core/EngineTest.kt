@@ -147,6 +147,160 @@ class EngineTest {
         )
     }
 
+    @Test
+    fun `does not corrupt code fences in non-chat markdown output`() {
+        val input = "## Summary\n\nHere is the snippet:\n\n```typescript\nval x: Int = 1\n```\n\nEnd of doc."
+        val markdown = Engine.generateMarkdown(input, SourceType.DOCS)
+
+        assertTrue(markdown.contains("```typescript"))
+        assertTrue(markdown.contains("val x: Int = 1"))
+        assertTrue(markdown.contains("```\n\nEnd of doc."))
+    }
+
+    @Test
+    fun `does not corrupt code fences in chat markdown output`() {
+        // Blind spot fix: normalizeMarkdownBody previously prepended "- " to fence
+        // lines, breaking the markdown code block entirely.
+        val input = "Alice 10:00 AM\nHere is my code:\n```js\nconst x = 1;\n```\nLooks good?"
+        val markdown = Engine.generateMarkdown(input, SourceType.CHAT)
+
+        // Fence lines must be preserved verbatim — not wrapped in "- "
+        assertTrue(markdown.contains("```js\n"))
+        assertTrue(markdown.contains("\n```"))
+        // Code body must not be bullet-prefixed
+        assertFalse(markdown.contains("- const x = 1;"))
+        // Code body must appear verbatim
+        assertTrue(markdown.contains("const x = 1;"))
+        // Regular chat lines before and after are still bulleted
+        assertTrue(markdown.contains("- Alice 10:00 AM"))
+        assertTrue(markdown.contains("- Looks good?"))
+    }
+
+    // ── Code Block Preservation ─────────────────────────────────────────
+
+    @Test
+    fun `preserves both opening and closing fences in the cleaned output`() {
+        val rawText = """
+Skip to content
+```javascript
+const x = 1;
+```
+Terms
+        """
+        val result = Engine.cleanText(RawInput(rawText = rawText, sourceTypeHint = SourceType.GENERIC), ruleSetOverride = GenericRuleSet)
+        assertTrue(result.cleanedText.contains("```javascript"))
+        assertTrue(result.cleanedText.contains("const x = 1;"))
+        // Closing fence must survive
+        val closingFences = result.cleanedText.lines().count { it.trim() == "```" }
+        assertEquals(1, closingFences)
+        // Suffix junk stripped
+        assertFalse(result.cleanedText.contains("Terms"))
+    }
+
+    @Test
+    fun `removes junk outside code block but preserves junk-matching lines inside it`() {
+        val rawText = """
+# PR title
+Reply
+```python
+Reply
+left a comment
+Copy link
+print("hello")
+```
+Copy link
+        """
+        val result = Engine.cleanText(RawInput(rawText = rawText, sourceTypeHint = SourceType.GITHUB_PR), ruleSetOverride = GitHubRuleSet)
+        val codeStart = result.cleanedText.indexOf("```python")
+        val codeEnd = result.cleanedText.lastIndexOf("```") + 3
+        val codeSection = result.cleanedText.substring(codeStart, codeEnd)
+        // Lines inside the code block preserved
+        assertTrue(codeSection.contains("Reply"))
+        assertTrue(codeSection.contains("left a comment"))
+        assertTrue(codeSection.contains("Copy link"))
+        // Same tokens outside the code block are removed
+        val beforeCode = result.cleanedText.substring(0, codeStart)
+        assertFalse(beforeCode.contains("Reply"))
+        val afterCode = result.cleanedText.substring(codeEnd)
+        assertFalse(afterCode.contains("Copy link"))
+    }
+
+    @Test
+    fun `handles multiple code blocks with junk between them`() {
+        val rawText = """
+# Docs
+```js
+const a = 1;
+```
+Advertisement
+```ts
+const b: number = 2;
+```
+        """
+        val result = Engine.cleanText(RawInput(rawText = rawText, sourceTypeHint = SourceType.GENERIC), ruleSetOverride = GenericRuleSet)
+        assertTrue(result.cleanedText.contains("```js"))
+        assertTrue(result.cleanedText.contains("const a = 1;"))
+        assertTrue(result.cleanedText.contains("```ts"))
+        assertTrue(result.cleanedText.contains("const b: number = 2;"))
+        // Junk between the two blocks is removed
+        assertFalse(result.cleanedText.contains("Advertisement"))
+    }
+
+    @Test
+    fun `unclosed code block preserves all subsequent lines`() {
+        val rawText = """
+# Title
+Intro text
+```python
+import os
+left a comment
+Reply
+Copy link
+        """
+        val result = Engine.cleanText(RawInput(rawText = rawText, sourceTypeHint = SourceType.GENERIC), ruleSetOverride = GenericRuleSet)
+        assertTrue(result.cleanedText.contains("```python"))
+        assertTrue(result.cleanedText.contains("import os"))
+        // These would normally be removed but are inside the unclosed code block
+        assertTrue(result.cleanedText.contains("left a comment"))
+        assertTrue(result.cleanedText.contains("Reply"))
+        assertTrue(result.cleanedText.contains("Copy link"))
+    }
+
+    @Test
+    fun `trimPrefix stops at an opening code fence`() {
+        val lines = listOf("Skip to content", "Navigation Menu", "```javascript", "const x = 1;", "```")
+        val result = Engine.trimPrefix(lines, GitHubRuleSet)
+        // Everything from the fence onwards must survive
+        assertEquals("```javascript", result[0])
+        assertTrue(result.contains("const x = 1;"))
+        assertEquals("```", result[result.size - 1])
+    }
+
+    @Test
+    fun `trimSuffix stops at a closing code fence`() {
+        val lines = listOf("Real content", "```js", "const y = 2;", "```", "Terms", "Privacy")
+        val result = Engine.trimSuffix(lines, GitHubRuleSet)
+        // Junk after the closing fence removed
+        assertFalse(result.contains("Terms"))
+        assertFalse(result.contains("Privacy"))
+        // The fence and its content must survive
+        assertTrue(result.contains("```js"))
+        assertTrue(result.contains("const y = 2;"))
+        assertEquals("```", result[result.size - 1])
+    }
+
+    @Test
+    fun `standalone diff-stat lines outside code block are removed by GitHub rules`() {
+        val lines = listOf("```diff", "+1", "-1", "```", "+200", "-95")
+        val result = Engine.cleanMiddle(lines, GitHubRuleSet)
+        // Inside the code block: preserved
+        assertTrue(result.contains("+1"))
+        assertTrue(result.contains("-1"))
+        // Outside: stripped
+        assertFalse(result.contains("+200"))
+        assertFalse(result.contains("-95"))
+    }
+
     // ── Full Cleanup Engine ─────────────────────────────────────────────
 
     @Test

@@ -115,6 +115,164 @@ describe('Markdown Output', () => {
 
     expect(markdown).toBe('# Cleaned Chat Excerpt\n\n- John Doe 10:42 AM\n- Please review this.\n\n- Jane Smith 10:43 AM');
   });
+
+  it('does not corrupt code fences in non-chat markdown output', () => {
+    const input = '## Summary\n\nHere is the snippet:\n\n```typescript\nconst x: number = 1;\n```\n\nEnd of doc.';
+    const markdown = generateMarkdown(input, 'docs');
+
+    expect(markdown).toContain('```typescript');
+    expect(markdown).toContain('const x: number = 1;');
+    expect(markdown).toContain('```\n\nEnd of doc.');
+  });
+
+  it('does not corrupt code fences in chat markdown output', () => {
+    // Blind spot fix: normalizeMarkdownBody previously prepended "- " to fence
+    // lines, breaking the markdown code block entirely.
+    const input = 'Alice 10:00 AM\nHere is my code:\n```js\nconst x = 1;\n```\nLooks good?';
+    const markdown = generateMarkdown(input, 'chat');
+
+    // Fence lines must be preserved verbatim — not wrapped in "- "
+    expect(markdown).toContain('```js\n');
+    expect(markdown).toContain('\n```');
+    // Code body must not be bullet-prefixed
+    expect(markdown).not.toContain('- const x = 1;');
+    // Code body must appear verbatim
+    expect(markdown).toContain('const x = 1;');
+    // Regular chat lines before and after are still bulleted
+    expect(markdown).toContain('- Alice 10:00 AM');
+    expect(markdown).toContain('- Looks good?');
+  });
+});
+
+describe('Code Block Preservation', () => {
+  it('preserves both opening and closing fences in the cleaned output', () => {
+    const rawText = `
+Skip to content
+\`\`\`javascript
+const x = 1;
+\`\`\`
+Terms
+    `;
+    const result = cleanText({ rawText, sourceTypeHint: 'generic' }, GenericRuleSet);
+    expect(result.cleanedText).toContain('```javascript');
+    expect(result.cleanedText).toContain('const x = 1;');
+    // Closing fence must survive
+    const lines = result.cleanedText.split('\n');
+    expect(lines.filter(l => l.trim() === '```').length).toBe(1);
+    // Suffix junk stripped
+    expect(result.cleanedText).not.toContain('Terms');
+  });
+
+  it('removes junk outside code block but preserves junk-matching lines inside it', () => {
+    // "Reply", "left a comment", "Copy link" are GitHub removeAnywhereExactLines.
+    // Outside a code block they are removed; inside they must be kept.
+    const rawText = `
+# PR title
+Reply
+\`\`\`python
+Reply
+left a comment
+Copy link
+print("hello")
+\`\`\`
+Copy link
+    `;
+    const result = cleanText({ rawText, sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    // Lines inside the code block preserved
+    const codeSection = result.cleanedText.slice(
+      result.cleanedText.indexOf('```python'),
+      result.cleanedText.lastIndexOf('```') + 3,
+    );
+    expect(codeSection).toContain('Reply');
+    expect(codeSection).toContain('left a comment');
+    expect(codeSection).toContain('Copy link');
+    // The same "Reply" and "Copy link" outside the code block are removed
+    const beforeCode = result.cleanedText.slice(0, result.cleanedText.indexOf('```python'));
+    expect(beforeCode).not.toContain('Reply');
+    const afterCode = result.cleanedText.slice(result.cleanedText.lastIndexOf('```') + 3);
+    expect(afterCode).not.toContain('Copy link');
+  });
+
+  it('handles multiple code blocks with junk between them', () => {
+    const rawText = `
+# Docs
+\`\`\`js
+const a = 1;
+\`\`\`
+Advertisement
+\`\`\`ts
+const b: number = 2;
+\`\`\`
+    `;
+    const result = cleanText({ rawText, sourceTypeHint: 'generic' }, GenericRuleSet);
+    expect(result.cleanedText).toContain('```js');
+    expect(result.cleanedText).toContain('const a = 1;');
+    expect(result.cleanedText).toContain('```ts');
+    expect(result.cleanedText).toContain('const b: number = 2;');
+    // Junk between the two blocks is removed
+    expect(result.cleanedText).not.toContain('Advertisement');
+  });
+
+  it('unclosed code block preserves all subsequent lines', () => {
+    // If a code fence is never closed, every line after it should be kept as-is,
+    // even if those lines would otherwise match removal rules.
+    const rawText = `
+# Title
+Intro text
+\`\`\`python
+import os
+left a comment
+Reply
+Copy link
+    `;
+    const result = cleanText({ rawText, sourceTypeHint: 'generic' }, GenericRuleSet);
+    expect(result.cleanedText).toContain('```python');
+    expect(result.cleanedText).toContain('import os');
+    // These would normally be removed by removeAnywhereExactLines but are inside
+    // the unclosed code block so they must be preserved.
+    expect(result.cleanedText).toContain('left a comment');
+    expect(result.cleanedText).toContain('Reply');
+    expect(result.cleanedText).toContain('Copy link');
+  });
+
+  it('trimPrefix stops at an opening code fence', () => {
+    const lines = ['Skip to content', 'Navigation Menu', '```javascript', 'const x = 1;', '```'];
+    const result = trimPrefix(lines, GitHubRuleSet);
+    // Everything from the fence onwards must survive
+    expect(result[0]).toBe('```javascript');
+    expect(result).toContain('const x = 1;');
+    expect(result[result.length - 1]).toBe('```');
+  });
+
+  it('trimSuffix stops at a closing code fence', () => {
+    const lines = ['Real content', '```js', 'const y = 2;', '```', 'Terms', 'Privacy'];
+    const result = trimSuffix(lines, GitHubRuleSet);
+    // Junk after the closing fence removed
+    expect(result).not.toContain('Terms');
+    expect(result).not.toContain('Privacy');
+    // The fence and its content must survive
+    expect(result).toContain('```js');
+    expect(result).toContain('const y = 2;');
+    expect(result[result.length - 1]).toBe('```');
+  });
+
+  it('standalone +N and -N diff-stat lines outside code block are removed by GitHub rules', () => {
+    const lines = [
+      '```diff',
+      '+1',
+      '-1',
+      '```',
+      '+200',
+      '-95',
+    ];
+    const result = cleanMiddle(lines, GitHubRuleSet);
+    // Inside the code block: preserved
+    expect(result).toContain('+1');
+    expect(result).toContain('-1');
+    // Outside: stripped
+    expect(result).not.toContain('+200');
+    expect(result).not.toContain('-95');
+  });
 });
 
 describe('Full Cleanup Engine', () => {
