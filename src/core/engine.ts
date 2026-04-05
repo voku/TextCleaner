@@ -23,8 +23,13 @@ export function getRuleSetForType(type: SourceType): CleanupRuleSet {
 }
 
 export function normalizeText(text: string): string[] {
-  // Normalize line endings to \n, trim outer whitespace, split into lines
-  return text.replace(/\r\n/g, '\n').trim().split('\n');
+  // Normalize line endings to \n, trim outer whitespace, split into lines.
+  // Strip U+FFFC (Object Replacement Character) — web pages replace images/icons
+  // with this character when copied as plain text; it is always noise.
+  // Normalize U+00A0 (No-Break Space) to a regular space — avoids mismatches
+  // against rule strings that use ordinary spaces.
+  return text.replace(/\r\n/g, '\n').trim().split('\n')
+    .map(line => line.replace(/\uFFFC/g, '').replace(/\u00A0/g, ' '));
 }
 
 export function isPreserved(line: string, ruleSet: CleanupRuleSet): boolean {
