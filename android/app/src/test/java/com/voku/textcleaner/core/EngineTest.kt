@@ -2527,4 +2527,20 @@ Do not share my personal information
         assertFalse(result.cleanedText.contains("Delete branch"))
         assertTrue(result.cleanedText.contains("More content."))
     }
+
+    @Test
+    fun `removes CodeRabbit run configuration lines`() {
+        val runConfig = "\u2699\uFE0F Run configuration"
+        val rawText = "Review text.\n$runConfig\nConfiguration used: Organization UI\n\nReview profile: CHILL\n\nPlan: Pro\n\nRun ID: 4a4099d8-00c3-4226-969b-2944f9ec9ff1\n\nMore review text."
+        val result = Engine.cleanText(
+            RawInput(rawText = rawText, sourceTypeHint = SourceType.GITHUB_PR),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Run configuration"))
+        assertFalse(result.cleanedText.contains("Configuration used:"))
+        assertFalse(result.cleanedText.contains("Review profile:"))
+        assertFalse(result.cleanedText.contains("Plan: Pro"))
+        assertFalse(result.cleanedText.contains("Run ID:"))
+        assertTrue(result.cleanedText.contains("More review text."))
+    }
 }

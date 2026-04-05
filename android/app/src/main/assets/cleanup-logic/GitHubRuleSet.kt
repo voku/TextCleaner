@@ -243,6 +243,7 @@ val GitHubRuleSet = CleanupRuleSet(
         "Fix all unresolved CodeRabbit comments on this PR:",
         "Push a commit to this branch (recommended)",
         "Create a new PR with the fixes",
+        "\u2699\uFE0F Run configuration",
         // Codex bot introduction lines
         "Your team has set up Codex to review pull requests in this repo. Reviews are triggered when you",
         "Open a pull request for review",
