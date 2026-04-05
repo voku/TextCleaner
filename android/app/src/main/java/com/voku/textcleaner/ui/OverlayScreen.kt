@@ -11,6 +11,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,10 +27,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -46,10 +47,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.voku.textcleaner.core.CleanedResult
 import com.voku.textcleaner.core.Engine
@@ -59,6 +66,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private val overlayPanelShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+
+// Scrollbar thumb geometry
+private val ScrollbarWidth = 3.dp
+private val ScrollbarEdgeOffset = 4.dp
+private val ScrollbarCornerRadius = 2.dp
+private val ScrollbarMinThumbHeight = 24.dp
 
 /**
  * Compact bottom-panel that renders inside a translucent [OverlayActivity].
@@ -152,7 +165,7 @@ fun OverlayScreen(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { onOpenFullApp(initialText) }) {
-                        Icon(Icons.Default.OpenInNew, contentDescription = "Open in full app")
+                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Open in full app")
                     }
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Default.Close, contentDescription = "Dismiss")
@@ -180,15 +193,34 @@ fun OverlayScreen(
                     )
 
                     // Scrollable cleaned-text preview (min 80 dp, max 240 dp)
+                    val scrollState = rememberScrollState()
+                    val scrollbarColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 80.dp, max = 240.dp)
-                            .background(
-                                color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                                shape = RoundedCornerShape(12.dp),
-                            )
-                            .verticalScroll(rememberScrollState())
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(color = MaterialTheme.colorScheme.surfaceContainerLowest)
+                            .drawWithContent {
+                                drawContent()
+                                // Draw a slim scrollbar thumb on the right edge when overflowing
+                                if (scrollState.maxValue > 0) {
+                                    val viewportH = size.height
+                                    val totalH = viewportH + scrollState.maxValue
+                                    val thumbH = (viewportH * viewportH / totalH)
+                                        .coerceAtLeast(ScrollbarMinThumbHeight.toPx())
+                                    val scrollFraction =
+                                        scrollState.value.toFloat() / scrollState.maxValue.toFloat()
+                                    val thumbTop = scrollFraction * (viewportH - thumbH)
+                                    drawRoundRect(
+                                        color = scrollbarColor,
+                                        topLeft = Offset(size.width - ScrollbarEdgeOffset.toPx(), thumbTop),
+                                        size = Size(ScrollbarWidth.toPx(), thumbH),
+                                        cornerRadius = CornerRadius(ScrollbarCornerRadius.toPx()),
+                                    )
+                                }
+                            }
+                            .verticalScroll(scrollState)
                             .padding(12.dp),
                     ) {
                         SelectionContainer {
@@ -210,39 +242,54 @@ fun OverlayScreen(
                             Button(
                                 onClick = { onReturnText(currentResult.cleanedText) },
                                 modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                             ) {
                                 Icon(
-                                    Icons.Default.Reply,
+                                    Icons.AutoMirrored.Filled.Reply,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
                                 )
-                                Spacer(Modifier.width(6.dp))
-                                Text("Return")
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    "Return",
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                             }
                         }
                         OutlinedButton(
                             onClick = { overlayCopyText(context, currentResult.cleanedText) },
                             modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                         ) {
                             Icon(
                                 Icons.Default.ContentCopy,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp),
                             )
-                            Spacer(Modifier.width(6.dp))
-                            Text("Copy")
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                "Copy",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                         OutlinedButton(
                             onClick = { overlayShareText(context, currentResult.cleanedText) },
                             modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                         ) {
                             Icon(
                                 Icons.Default.Share,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp),
                             )
-                            Spacer(Modifier.width(6.dp))
-                            Text("Share")
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                "Share",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
                     }
                 }
