@@ -323,16 +323,41 @@ export const GitHubRuleSet: CleanupRuleSet = {
       end: /^$/,
       maxLines: 30,
     },
-    // Bot review header block: "[bot]" line to next blank line
+    // Bot review header block: "[bot]" line to next blank line (maxLines 30 to catch longer reviews)
     {
       start: /^.*\[bot\]$/i,
-      maxLines: 10,
+      maxLines: 30,
     },
     // CodeRabbit "Suggested fix" block
     {
       start: /^Suggested fix$/i,
       end: /^$/,
       maxLines: 40,
+    },
+    // CodeRabbit summary block: "Summary by CodeRabbit" to next blank line
+    {
+      start: /^Summary by CodeRabbit$/i,
+      maxLines: 40,
+    },
+    // CodeRabbit "Walkthrough" section to next blank line
+    {
+      start: /^Walkthrough$/i,
+      maxLines: 60,
+    },
+    // CodeRabbit "Poem" section to next blank line
+    {
+      start: /^Poem$/i,
+      maxLines: 20,
+    },
+    // "Sequence Diagram(s)" section to next blank line
+    {
+      start: /^Sequence Diagram\(s\)$/i,
+      maxLines: 60,
+    },
+    // "Suggested change(s)" UI block: header + original/replacement to next blank line
+    {
+      start: /^Suggested changes?$/i,
+      maxLines: 10,
     },
   ],
 };

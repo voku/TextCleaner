@@ -1734,4 +1734,327 @@ Do not share my personal information
         assertTrue(result.cleanedText.contains("I reviewed commits 1 through 5 in detail."))
         assertFalse(result.cleanedText.contains("Showing 3 changed files"))
     }
+
+    // ── Block-aware removal ──────────────────────────────────────────────
+
+    @Test
+    fun `removeBlocks removes CodeRabbit review table block (Cohort to blank line)`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "Motivation\nFix the bug in auth.\nCohort / File(s)\tSummary\nsrc/auth.ts\tFixed token refresh logic\nsrc/api.ts\tUpdated error handling\n\nDescription\nThis PR fixes token refresh.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Cohort / File(s)"))
+        assertFalse(result.cleanedText.contains("Fixed token refresh logic"))
+        assertTrue(result.cleanedText.contains("Motivation"))
+        assertTrue(result.cleanedText.contains("Description"))
+        assertTrue(result.cleanedText.contains("This PR fixes token refresh."))
+    }
+
+    @Test
+    fun `removeBlocks removes bot review header block up to blank line`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "Description\nThis is the PR description.\n\nreview-assist[bot]\nreview-assist bot reviewed 1 hour ago\nContributor\nreview-assist bot\nleft a comment\nCode Review\n\nThe code looks good but needs more tests.\n\nHowever, the auth module should also handle token expiry.\nConsider adding a retry mechanism for failed requests.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("review-assist[bot]"))
+        assertTrue(result.cleanedText.contains("This is the PR description."))
+        assertTrue(result.cleanedText.contains("The code looks good but needs more tests."))
+        assertTrue(result.cleanedText.contains("Consider adding a retry mechanism for failed requests."))
+    }
+
+    @Test
+    fun `removeBlocks removes Summary by CodeRabbit block body up to blank line`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# PR\nSome content\nSummary by CodeRabbit\nRelease Notes\nNew Features\nGesture recognition improved.\n\nMore real content.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Summary by CodeRabbit"))
+        assertFalse(result.cleanedText.contains("Release Notes"))
+        assertFalse(result.cleanedText.contains("Gesture recognition improved."))
+        assertTrue(result.cleanedText.contains("Some content"))
+        assertTrue(result.cleanedText.contains("More real content."))
+    }
+
+    @Test
+    fun `removeBlocks removes Walkthrough section body up to blank line`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# PR\nSome content\nWalkthrough\nThis PR adds feature X.\nAll tests pass.\n\nMore real content.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Walkthrough"))
+        assertFalse(result.cleanedText.contains("This PR adds feature X."))
+        assertTrue(result.cleanedText.contains("Some content"))
+        assertTrue(result.cleanedText.contains("More real content."))
+    }
+
+    @Test
+    fun `removeBlocks removes Poem section body up to blank line`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# PR\nSome content\nPoem\n\uD83D\uDC30 A hop, skip, and delegate trace!\nRuntime wisdom shows its face.\n\nMore real content.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Poem"))
+        assertFalse(result.cleanedText.contains("A hop, skip, and delegate trace!"))
+        assertTrue(result.cleanedText.contains("Some content"))
+        assertTrue(result.cleanedText.contains("More real content."))
+    }
+
+    @Test
+    fun `removeBlocks removes Sequence Diagrams section body up to blank line`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# PR\nSome content\nSequence Diagram(s)\nsequenceDiagram\nA->>B: call\nB-->>A: response\n\nMore real content.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Sequence Diagram(s)"))
+        assertFalse(result.cleanedText.contains("sequenceDiagram"))
+        assertTrue(result.cleanedText.contains("Some content"))
+        assertTrue(result.cleanedText.contains("More real content."))
+    }
+
+    @Test
+    fun `removeBlocks preserves code block content even when it matches junk patterns`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# PR\n```\nreview-assist[bot]\nSummary by CodeRabbit\nPoem\n```\nReal content.",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertTrue(result.cleanedText.contains("review-assist[bot]"))
+        assertTrue(result.cleanedText.contains("Summary by CodeRabbit"))
+        assertTrue(result.cleanedText.contains("Real content."))
+    }
+
+    // ── Golden fixture integration test ─────────────────────────────────
+    // Mirrors the TypeScript golden fixture at engine.test.ts:1815+
+
+    @Test
+    fun `golden fixture cleans a complete real PR paste to expected output`() {
+        val fullPagePaste = listOf(
+            "- - - - - - - - - - - - - - - Skip to content",
+            "voku",
+            "AmysEcho",
+            "Repository navigation",
+            "Code",
+            "Issues",
+            "2",
+            "(2)",
+            "Pull requests",
+            "12",
+            "(12)",
+            "Agents",
+            "Discussions",
+            "Actions",
+            "Projects",
+            "Wiki",
+            // PR title
+            "Expose runtime diagnosability for gesture detector and surface in status/docs/tests",
+            // PR metadata
+            "#1123",
+            "Merged",
+            "voku",
+            "merged 3 commits into",
+            "main",
+            "from",
+            "codex/work-on-todos-autonomously",
+            "yesterday",
+            "+146",
+            "-16",
+            "Lines changed: 146 additions &amp; 16 deletions",
+            "Conversation6 (6)",
+            "Commits3 (3)",
+            "Checks14 (14)",
+            "Files changed9 (9)",
+            "Conversation",
+            "@voku",
+            "Owner",
+            "voku",
+            "commented",
+            "2 days ago",
+            "\u2022",
+            // PR body — the content that matters
+            "Motivation",
+            "Reduce time-to-root-cause for MediaPipe/gesture runtime incidents.",
+            "",
+            "Description",
+            "Added runtime diagnostics to GestureDetector including runtimeDelegates.",
+            "",
+            "Testing",
+            "Ran unit tests for the gesture module.",
+            "",
+            // Bot review block
+            "review-assist[bot]",
+            "review-assist bot reviewed 1 hour ago",
+            "Contributor",
+            "review-assist bot",
+            "left a comment",
+            "Code Review",
+            "",
+            "This pull request implements runtime diagnosability enhancements.",
+            "",
+            // CodeRabbit metadata
+            "Codex Task",
+            "Summary by CodeRabbit",
+            "Release Notes",
+            "",
+            // Inline review comment
+            "webapp/src/gesture/core/GestureDetector.ts",
+            "Outdated",
+            "Comment on lines +532 to +551",
+            "  getRuntimeDiagnostics(): {",
+            "    running: boolean;",
+            "  } {",
+            "The return type is complex and duplicated.",
+            "",
+            // Merge UI noise
+            "Caution",
+            "Review failed",
+            "The pull request is closed.",
+            "All checks have passed",
+            "Squash and merge",
+            "Confirm squash and merge",
+            "",
+            // Sidebar
+            "Reviewers",
+            "+1 more reviewer",
+            "Assignees",
+            "No one\u2014",
+            "Labels",
+            "None yet",
+            "Projects",
+            "Milestone",
+            "No milestone",
+            "Development",
+            "Successfully merging this pull request may close these issues.",
+            "",
+            // Footer
+            "Footer",
+            "\u00A9 2026 GitHub, Inc.",
+            "Footer navigation",
+            "Terms",
+            "Privacy",
+        ).joinToString("\n")
+
+        val result = Engine.cleanText(
+            RawInput(rawText = fullPagePaste, sourceTypeHint = SourceType.GITHUB_PR),
+            ruleSetOverride = GitHubRuleSet,
+        )
+
+        // ── Must be present (the meaningful content) ─────────────────────
+        assertTrue(result.cleanedText.contains("Expose runtime diagnosability for gesture detector and surface in status/docs/tests"))
+        assertTrue(result.cleanedText.contains("Motivation"))
+        assertTrue(result.cleanedText.contains("Reduce time-to-root-cause for MediaPipe/gesture runtime incidents."))
+        assertTrue(result.cleanedText.contains("Description"))
+        assertTrue(result.cleanedText.contains("Added runtime diagnostics to GestureDetector including runtimeDelegates."))
+        assertTrue(result.cleanedText.contains("Testing"))
+        assertTrue(result.cleanedText.contains("Ran unit tests for the gesture module."))
+        assertTrue(result.cleanedText.contains("This pull request implements runtime diagnosability enhancements."))
+        // Code review comment preserved
+        assertTrue(result.cleanedText.contains("webapp/src/gesture/core/GestureDetector.ts"))
+        assertTrue(result.cleanedText.contains("getRuntimeDiagnostics(): {"))
+        assertTrue(result.cleanedText.contains("The return type is complex and duplicated."))
+
+        // ── Must NOT be present (the noise) ──────────────────────────────
+        // Header chrome
+        assertFalse(result.cleanedText.contains("Skip to content"))
+        assertFalse(result.cleanedText.contains("Repository navigation"))
+        assertFalse(result.cleanedText.contains("AmysEcho"))
+        // PR metadata
+        assertFalse(result.cleanedText.contains("#1123"))
+        assertFalse(result.cleanedText.contains("merged 3 commits into"))
+        assertFalse(result.cleanedText.contains("Lines changed: 146 additions"))
+        assertFalse(result.cleanedText.contains("Conversation6 (6)"))
+        // Bot review block header
+        assertFalse(result.cleanedText.contains("review-assist[bot]"))
+        // CodeRabbit metadata
+        assertFalse(result.cleanedText.contains("Codex Task"))
+        assertFalse(result.cleanedText.contains("Summary by CodeRabbit"))
+        assertFalse(result.cleanedText.contains("Release Notes"))
+        // Merge UI noise
+        assertFalse(result.cleanedText.contains("Caution"))
+        assertFalse(result.cleanedText.contains("Review failed"))
+        assertFalse(result.cleanedText.contains("The pull request is closed."))
+        assertFalse(result.cleanedText.contains("All checks have passed"))
+        assertFalse(result.cleanedText.contains("Squash and merge"))
+        // Sidebar
+        assertFalse(result.cleanedText.contains("No one\u2014"))
+        assertFalse(result.cleanedText.contains("No milestone"))
+        // Footer
+        assertFalse(result.cleanedText.contains("Footer navigation"))
+        assertFalse(result.cleanedText.contains("\u00A9 2026 GitHub, Inc."))
+        assertFalse(result.cleanedText.contains("Terms"))
+
+        // ── Line count sanity check ───────────────────────────────────────
+        // Meaningful content is ~15-25 lines; >35 non-blank lines means noise leakage.
+        val nonBlankLines = result.cleanedText.lines().filter { it.trim().isNotEmpty() }
+        assertTrue("Expected ≥5 non-blank lines but got ${nonBlankLines.size}", nonBlankLines.size >= 5)
+        assertTrue("Expected ≤35 non-blank lines but got ${nonBlankLines.size}", nonBlankLines.size <= 35)
+    }
+
+    // ── Content preservation / over-removal protection ───────────────────
+
+    @Test
+    fun `does not over-remove PR body with markdown headings, bullets, and multi-paragraph content`() {
+        val input = """
+            # Fix authentication token refresh
+            
+            ## Motivation
+            Users are being logged out unexpectedly when their token expires during an active session.
+            The root cause is the refresh handler not being invoked on 401 responses.
+            
+            ## Description
+            - Added a retry interceptor in `api/client.ts` that catches 401s and calls `refreshToken()`
+            - Updated `AuthService.refresh()` to return the new token and store it in session storage
+            - Patched the token expiry check in `SessionManager` to use server time, not local clock
+            
+            ## Testing
+            - Unit tests added for the retry interceptor (3 new test cases)
+            - Integration test verifies that a 401 mid-session triggers refresh and retries the original request
+            - Manual test on staging: token expiry now seamlessly refreshes without logout
+            
+            ## Notes
+            > This change requires the server to return a `Retry-After` header on 401 responses.
+            > Without it, the interceptor falls back to a fixed 1-second delay.
+        """.trimIndent()
+
+        val result = Engine.cleanText(
+            RawInput(rawText = input, sourceTypeHint = SourceType.GITHUB_PR),
+            ruleSetOverride = GitHubRuleSet,
+        )
+
+        // All section headings preserved
+        assertTrue(result.cleanedText.contains("# Fix authentication token refresh"))
+        assertTrue(result.cleanedText.contains("## Motivation"))
+        assertTrue(result.cleanedText.contains("## Description"))
+        assertTrue(result.cleanedText.contains("## Testing"))
+        assertTrue(result.cleanedText.contains("## Notes"))
+
+        // Substantive content preserved
+        assertTrue(result.cleanedText.contains("Users are being logged out unexpectedly"))
+        assertTrue(result.cleanedText.contains("Added a retry interceptor"))
+        assertTrue(result.cleanedText.contains("Unit tests added for the retry interceptor"))
+        assertTrue(result.cleanedText.contains("Retry-After"))
+
+        // At least N non-blank lines preserved (lower bound)
+        val nonBlankLines = result.cleanedText.lines().filter { it.trim().isNotEmpty() }
+        assertTrue("Expected at least 10 non-blank lines preserved but got ${nonBlankLines.size}", nonBlankLines.size >= 10)
+    }
 }

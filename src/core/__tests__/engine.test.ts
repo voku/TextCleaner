@@ -1700,6 +1700,61 @@ Privacy`;
     expect(result.cleanedText).toContain('Consider adding a retry mechanism for failed requests.');
   });
 
+  it('removes Summary by CodeRabbit block body up to blank line', () => {
+    const result = cleanText({
+      rawText: '# PR\nSome content\nSummary by CodeRabbit\nRelease Notes\nNew Features\nGesture recognition improved.\n\nMore real content.',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).not.toContain('Release Notes');
+    expect(result.cleanedText).not.toContain('Gesture recognition improved.');
+    expect(result.cleanedText).toContain('Some content');
+    expect(result.cleanedText).toContain('More real content.');
+  });
+
+  it('removes Walkthrough section body up to blank line', () => {
+    const result = cleanText({
+      rawText: '# PR\nSome content\nWalkthrough\nThis PR adds feature X.\nAll tests pass.\n\nMore real content.',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Walkthrough');
+    expect(result.cleanedText).not.toContain('This PR adds feature X.');
+    expect(result.cleanedText).toContain('Some content');
+    expect(result.cleanedText).toContain('More real content.');
+  });
+
+  it('removes Poem section body up to blank line', () => {
+    const result = cleanText({
+      rawText: '# PR\nSome content\nPoem\n\uD83D\uDC30 A hop, skip, and delegate trace!\nRuntime wisdom shows its face.\n\nMore real content.',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Poem');
+    expect(result.cleanedText).not.toContain('A hop, skip, and delegate trace!');
+    expect(result.cleanedText).toContain('Some content');
+    expect(result.cleanedText).toContain('More real content.');
+  });
+
+  it('removes Sequence Diagram(s) section body up to blank line', () => {
+    const result = cleanText({
+      rawText: '# PR\nSome content\nSequence Diagram(s)\nsequenceDiagram\nA->>B: call\nB-->>A: response\n\nMore real content.',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Sequence Diagram(s)');
+    expect(result.cleanedText).not.toContain('sequenceDiagram');
+    expect(result.cleanedText).toContain('Some content');
+    expect(result.cleanedText).toContain('More real content.');
+  });
+
+  it('preserves code block content even when lines match block-start patterns', () => {
+    const result = cleanText({
+      rawText: '# PR\n```\nreview-assist[bot]\nSummary by CodeRabbit\nPoem\n```\nReal content.',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).toContain('review-assist[bot]');
+    expect(result.cleanedText).toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).toContain('Real content.');
+  });
+
   // ── Mid-body noise removal (blind-spot analysis findings) ───────────────
 
   it('removes standalone severity labels (medium, low, high, critical)', () => {
@@ -1806,6 +1861,51 @@ Privacy`;
     expect(result.cleanedText).not.toContain('referenced this pull request');
     expect(result.cleanedText).not.toContain('marked as resolved');
     expect(result.cleanedText).toContain('Actual discussion content.');
+  });
+
+  // ── Content preservation / over-removal protection ───────────────────────
+
+  it('does not over-remove a PR body with markdown headings, bullets, and multi-paragraph content', () => {
+    const input = [
+      '# Fix authentication token refresh',
+      '',
+      '## Motivation',
+      'Users are being logged out unexpectedly when their token expires during an active session.',
+      'The root cause is the refresh handler not being invoked on 401 responses.',
+      '',
+      '## Description',
+      '- Added a retry interceptor in `api/client.ts` that catches 401s and calls `refreshToken()`',
+      '- Updated `AuthService.refresh()` to return the new token and store it in session storage',
+      '- Patched the token expiry check in `SessionManager` to use server time, not local clock',
+      '',
+      '## Testing',
+      '- Unit tests added for the retry interceptor (3 new test cases)',
+      '- Integration test verifies that a 401 mid-session triggers refresh and retries the original request',
+      '- Manual test on staging: token expiry now seamlessly refreshes without logout',
+      '',
+      '## Notes',
+      '> This change requires the server to return a `Retry-After` header on 401 responses.',
+      '> Without it, the interceptor falls back to a fixed 1-second delay.',
+    ].join('\n');
+
+    const result = cleanText({ rawText: input, sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+
+    // All section headings preserved
+    expect(result.cleanedText).toContain('# Fix authentication token refresh');
+    expect(result.cleanedText).toContain('## Motivation');
+    expect(result.cleanedText).toContain('## Description');
+    expect(result.cleanedText).toContain('## Testing');
+    expect(result.cleanedText).toContain('## Notes');
+
+    // Substantive content preserved
+    expect(result.cleanedText).toContain('Users are being logged out unexpectedly');
+    expect(result.cleanedText).toContain('Added a retry interceptor');
+    expect(result.cleanedText).toContain('Unit tests added for the retry interceptor');
+    expect(result.cleanedText).toContain('Retry-After');
+
+    // Lower bound: must keep at least 10 non-blank lines
+    const nonBlankLines = result.cleanedText.split('\n').filter(l => l.trim() !== '');
+    expect(nonBlankLines.length).toBeGreaterThanOrEqual(10);
   });
 
   // ── Golden fixture integration test ─────────────────────────────────────

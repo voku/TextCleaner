@@ -52,7 +52,7 @@ object Engine {
                     break
                 }
                 unrecognizedCount++
-                if (unrecognizedCount > 3) {
+                if (unrecognizedCount > 5) {
                     break
                 }
             }
@@ -88,7 +88,7 @@ object Engine {
                     break
                 }
                 unrecognizedCount++
-                if (unrecognizedCount > 3) {
+                if (unrecognizedCount > 5) {
                     break
                 }
             }
@@ -99,6 +99,79 @@ object Engine {
         } else {
             lines
         }
+    }
+
+    /**
+     * Remove structural blocks identified by start/end marker patterns.
+     * Mirrors `removeBlocks` in `src/core/engine.ts`.
+     */
+    fun removeBlocks(lines: List<String>, ruleSet: CleanupRuleSet): List<String> {
+        val patterns = ruleSet.blockPatterns
+        if (patterns.isNullOrEmpty()) return lines
+
+        val result = mutableListOf<String>()
+        var inCodeBlock = false
+        var i = 0
+
+        while (i < lines.size) {
+            val trimmed = lines[i].trim()
+
+            // Track code blocks — never remove inside them
+            if (trimmed.startsWith("```")) {
+                inCodeBlock = !inCodeBlock
+                result.add(lines[i])
+                i++
+                continue
+            }
+
+            if (inCodeBlock) {
+                result.add(lines[i])
+                i++
+                continue
+            }
+
+            // Try to match a block start
+            var matched = false
+            for (bp in patterns) {
+                if (bp.start.containsMatchIn(trimmed)) {
+                    val maxLen = bp.maxLines
+                    if (bp.end != null) {
+                        // Scan forward for the end marker
+                        var j = i + 1
+                        var found = false
+                        while (j < lines.size && (j - i) < maxLen) {
+                            if (bp.end.containsMatchIn(lines[j].trim())) {
+                                found = true
+                                j++ // skip the end line too
+                                break
+                            }
+                            j++
+                        }
+                        if (found) {
+                            i = j // skip entire block
+                            matched = true
+                        }
+                        // If end not found within maxLines, don't remove anything
+                    } else {
+                        // No end pattern — block extends to next blank line
+                        var j = i + 1
+                        while (j < lines.size && (j - i) < maxLen && lines[j].trim().isNotEmpty()) {
+                            j++
+                        }
+                        i = j // skip block (blank line itself kept on next iteration)
+                        matched = true
+                    }
+                    break
+                }
+            }
+
+            if (!matched) {
+                result.add(lines[i])
+                i++
+            }
+        }
+
+        return result
     }
 
     fun cleanMiddle(
@@ -261,6 +334,7 @@ object Engine {
         } else {
             currentLines = trimPrefix(originalLines, ruleSet)
             currentLines = trimSuffix(currentLines, ruleSet)
+            currentLines = removeBlocks(currentLines, ruleSet)
             currentLines = cleanMiddle(currentLines, ruleSet, isLargeText)
             currentLines = collapseBlankLines(currentLines)
         }
