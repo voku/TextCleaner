@@ -27,7 +27,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.automirrored.filled.Article
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AutoFixHigh
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
@@ -35,7 +36,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
@@ -241,7 +241,7 @@ fun MainScreen(
                 ),
                 actions = {
                     IconButton(onClick = { openRepository(context) }) {
-                        Icon(Icons.Default.OpenInNew, contentDescription = "View on GitHub")
+                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "View on GitHub")
                     }
                     IconButton(onClick = { showCodeSheet = true }) {
                         Icon(Icons.Default.Code, contentDescription = "View cleanup logic")
@@ -470,7 +470,7 @@ private fun ControlsSection(
                             onClick = onLoadSample,
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Icon(Icons.Default.Article, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Icon(Icons.AutoMirrored.Filled.Article, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("Load sample")
                         }

@@ -27,10 +27,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -165,7 +165,7 @@ fun OverlayScreen(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { onOpenFullApp(initialText) }) {
-                        Icon(Icons.Default.OpenInNew, contentDescription = "Open in full app")
+                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Open in full app")
                     }
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Default.Close, contentDescription = "Dismiss")
@@ -245,7 +245,7 @@ fun OverlayScreen(
                                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                             ) {
                                 Icon(
-                                    Icons.Default.Reply,
+                                    Icons.AutoMirrored.Filled.Reply,
                                     contentDescription = null,
                                     modifier = Modifier.size(18.dp),
                                 )
