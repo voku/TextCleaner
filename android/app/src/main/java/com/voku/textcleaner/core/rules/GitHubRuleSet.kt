@@ -77,7 +77,7 @@ val GitHubRuleSet = CleanupRuleSet(
         "commented",
     ),
     prefixRegexes = listOf(
-        Regex("^(?:- - - )?Skip to content$", RegexOption.IGNORE_CASE),
+        Regex("^(?:- )*Skip to content$", RegexOption.IGNORE_CASE),
         Regex("^Search or jump to\\.\\.\\.$", RegexOption.IGNORE_CASE),
         Regex("^\\d+$", RegexOption.IGNORE_CASE),
         Regex("^\\(\\d+\\)$", RegexOption.IGNORE_CASE),
@@ -85,7 +85,7 @@ val GitHubRuleSet = CleanupRuleSet(
     suffixRegexes = listOf(
         Regex("^\u00A9 \\d{4} GitHub, Inc\\.$", RegexOption.IGNORE_CASE),
         Regex("^@.+$", RegexOption.IGNORE_CASE),
-        Regex("^\\d+ more reviewer$", RegexOption.IGNORE_CASE),
+        Regex("^\\+?\\d+ more reviewers?$", RegexOption.IGNORE_CASE),
     ),
     removeAnywhereExactLines = listOf(
         "Copy link",
@@ -128,6 +128,62 @@ val GitHubRuleSet = CleanupRuleSet(
         "Owner",
         "commented",
         "Contributor",
+        "Review requested",
+        "Copilot code review",
+        "Copilot requested your review on this pull request.",
+        "Copilot uses AI. Check for mistakes.",
+        "Mention @copilot in a comment to make changes to this pull request.",
+        "Read all affected files",
+        "Merged",
+        "Outdated",
+        // Discovered via static analysis of real PR samples
+        "Conversation",
+        "Conversations",
+        "Codex Task",
+        "Summary by CodeRabbit",
+        "Sequence Diagram(s)",
+        "Poem",
+        "CodeRabbit",
+        "Release Notes",
+        // Discovered via analysis of GitHub Issue, Repo, and Files Changed pages
+        "Type '/' to search",
+        "Sponsor this project",
+        "No packages published",
+        "Open in github.dev",
+        "Open with GitHub Desktop",
+        "View all files",
+        "View all releases",
+        "Nothing to show",
+        // Files Changed tab UI chrome
+        "Filter changed files",
+        "Show file tree",
+        "Hide file tree",
+        "Expand all",
+        "Collapse all",
+        "Jump to file",
+        "Load diff",
+        "Viewed",
+        "This file was deleted.",
+        // Issue / PR page chrome
+        "Jump to bottom",
+        "opened this issue",
+        "Leave a comment",
+        "Lock conversation",
+        "Delete issue",
+        "Linked pull requests",
+        "Markdown is supported",
+        "Attach files by dragging & dropping, selecting or pasting them.",
+        "Add a comment to start a discussion",
+        "You are not currently watching this repository",
+        "You must be logged in to vote",
+        "No issues match the current filter",
+        "No branches or tags",
+        "Label issues and pull requests for new contributors",
+        // GitHub sign-in / auth prompts
+        "Have a question about this project? Sign up for a free GitHub account to open an issue and contact its maintainers and the community.",
+        "Sign up for GitHub",
+        "Already on GitHub? Sign in to your account",
+        "Pick a username",
     ),
     removeAnywhereContains = emptyList(),
     removeAnywhereRegexes = listOf(
@@ -154,11 +210,13 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^Commits\\d+ \\(\\d+\\)$", RegexOption.IGNORE_CASE),
         Regex("^Checks\\d+ \\(\\d+\\)$", RegexOption.IGNORE_CASE),
         Regex("^Files changed\\d+ \\(\\d+\\)$", RegexOption.IGNORE_CASE),
-        Regex("^Lines changed: \\d+ additions & \\d+ deletions$", RegexOption.IGNORE_CASE),
+        Regex("^Lines changed: \\d+ additions (?:&|&amp;) \\d+ deletions$", RegexOption.IGNORE_CASE),
+        Regex("^#\\d+$", RegexOption.IGNORE_CASE),
+        Regex("^merged \\d+ commits? into$", RegexOption.IGNORE_CASE),
         Regex("^wants to merge \\d+ commits? into$", RegexOption.IGNORE_CASE),
         Regex("^.* wants to merge \\d+ commits? into .*$", RegexOption.IGNORE_CASE),
         Regex("^Reviewed commit: [a-f0-9]+$", RegexOption.IGNORE_CASE),
-        Regex("^Comment on lines \\+\\d+ to \\+\\d+$", RegexOption.IGNORE_CASE),
+        Regex("^Comment on lines \\+\\d+ to \\+?\\d+$", RegexOption.IGNORE_CASE),
         Regex("^\u26A0\uFE0F Outside diff range comments \\(\\d+\\)$", RegexOption.IGNORE_CASE),
         Regex("^DGS Integration Tests / .*$", RegexOption.IGNORE_CASE),
         Regex("^\\d+ (minute|hour|day|month|year)s? ago$", RegexOption.IGNORE_CASE),
@@ -168,6 +226,32 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^Useful\\? React with \uD83D\uDC4D / \uD83D\uDC4E\\.$", RegexOption.IGNORE_CASE),
         Regex("^Reply\\.\\.\\.$", RegexOption.IGNORE_CASE),
         Regex("^@.+\\s+Reply\\.\\.\\.$", RegexOption.IGNORE_CASE),
+        Regex("^\\+\\d+$"),
+        Regex("^-\\d+$"),
+        Regex("^\\d+ participants?$", RegexOption.IGNORE_CASE),
+        // Discovered via static analysis of real PR samples
+        Regex("^\uD83D\uDEA5 Pre-merge checks.*$"),              // pre-merge checks summary line
+        Regex("^\uD83C\uDFAF \\d+.*\u23F1\uFE0F.*$"),           // CodeRabbit review effort value
+        Regex("^\uD83E\uDD16 Hi @.+", RegexOption.IGNORE_CASE), // GitHub Actions bot acknowledgment
+        Regex("^@.+Reply\\.\\.\\.$", RegexOption.IGNORE_CASE),   // tab-less "Reply..." button variant
+        Regex("^P[0-9] Badge .+", RegexOption.IGNORE_CASE),      // Codex/review priority badge lines
+        Regex("^@[a-zA-Z0-9][a-zA-Z0-9._-]*$", RegexOption.IGNORE_CASE), // standalone @handle lines
+        Regex("^(?:[a-f0-9]{7}|[a-f0-9]{40})$"),                       // short (7) and full (40) commit SHAs only
+        // Discovered via analysis of GitHub Issue, Repo, and Files Changed pages
+        Regex("^Used by \\d+( users?)?$", RegexOption.IGNORE_CASE),    // GitHub repo sidebar stat
+        Regex("^\\d+ contributors?$", RegexOption.IGNORE_CASE),         // GitHub contributors count
+        Regex("^Commits \\d+$", RegexOption.IGNORE_CASE),               // Files Changed tab bar (space format)
+        Regex("^Checks \\d+$", RegexOption.IGNORE_CASE),                // Files Changed tab bar (space format)
+        Regex("^Files changed \\d+$", RegexOption.IGNORE_CASE),         // Files Changed tab bar (space format)
+        Regex("^Showing \\d+ changed files? with \\d+ additions? and \\d+ deletions?\\.$", RegexOption.IGNORE_CASE), // diff summary
+        Regex("^\u00B7\\s+\\d+ comments?$", RegexOption.IGNORE_CASE),  // "· N comments" middle-dot separator
+        Regex("^\u00B7$"),                                               // standalone middle-dot separator
+        Regex("^[a-zA-Z0-9][a-zA-Z0-9._-]* changed the title .*$", RegexOption.IGNORE_CASE), // issue title-change (username ≥1 char)
+        Regex("^Some comments are outside the diff and can['\u2019]t be posted inline due to platform limitations\\.$", RegexOption.IGNORE_CASE), // both apostrophe variants
+        Regex("^yesterday$", RegexOption.IGNORE_CASE),                  // relative timestamp
+        Regex("^last (week|month|year)$", RegexOption.IGNORE_CASE),     // relative timestamp
+        Regex("^(a|an) (minute|hour|day|week|month|year) ago$", RegexOption.IGNORE_CASE), // singular relative timestamp
+        Regex("^\\d+% of \\d+ files? viewed$", RegexOption.IGNORE_CASE), // Files Changed progress indicator
     ),
     preserveRegexes = listOf(
         Regex("^#+ "),                              // Headings

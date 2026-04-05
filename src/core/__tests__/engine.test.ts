@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cleanText, normalizeText, trimPrefix, trimSuffix, cleanMiddle, collapseBlankLines, generateMarkdown } from '../engine';
+import { cleanText, normalizeText, trimPrefix, trimSuffix, cleanMiddle, collapseBlankLines, generateMarkdown, removeBlocks } from '../engine';
 import { detectSourceType } from '../detector';
 import { GenericRuleSet } from '../rules/generic';
 import { GitHubRuleSet } from '../rules/github';
@@ -114,6 +114,164 @@ describe('Markdown Output', () => {
     const markdown = generateMarkdown('John Doe 10:42 AM\nPlease review this.\n\nJane Smith 10:43 AM', 'chat');
 
     expect(markdown).toBe('# Cleaned Chat Excerpt\n\n- John Doe 10:42 AM\n- Please review this.\n\n- Jane Smith 10:43 AM');
+  });
+
+  it('does not corrupt code fences in non-chat markdown output', () => {
+    const input = '## Summary\n\nHere is the snippet:\n\n```javascript\nconst x = 1;\n```\n\nEnd of doc.';
+    const markdown = generateMarkdown(input, 'docs');
+
+    expect(markdown).toContain('```javascript');
+    expect(markdown).toContain('const x = 1;');
+    expect(markdown).toContain('```\n\nEnd of doc.');
+  });
+
+  it('does not corrupt code fences in chat markdown output', () => {
+    // Blind spot fix: normalizeMarkdownBody previously prepended "- " to fence
+    // lines, breaking the markdown code block entirely.
+    const input = 'Alice 10:00 AM\nHere is my code:\n```js\nconst x = 1;\n```\nLooks good?';
+    const markdown = generateMarkdown(input, 'chat');
+
+    // Fence lines must be preserved verbatim — not wrapped in "- "
+    expect(markdown).toContain('```js\n');
+    expect(markdown).toContain('\n```');
+    // Code body must not be bullet-prefixed
+    expect(markdown).not.toContain('- const x = 1;');
+    // Code body must appear verbatim
+    expect(markdown).toContain('const x = 1;');
+    // Regular chat lines before and after are still bulleted
+    expect(markdown).toContain('- Alice 10:00 AM');
+    expect(markdown).toContain('- Looks good?');
+  });
+});
+
+describe('Code Block Preservation', () => {
+  it('preserves both opening and closing fences in the cleaned output', () => {
+    const rawText = `
+Skip to content
+\`\`\`javascript
+const x = 1;
+\`\`\`
+Terms
+    `;
+    const result = cleanText({ rawText, sourceTypeHint: 'generic' }, GenericRuleSet);
+    expect(result.cleanedText).toContain('```javascript');
+    expect(result.cleanedText).toContain('const x = 1;');
+    // Closing fence must survive
+    const lines = result.cleanedText.split('\n');
+    expect(lines.filter(l => l.trim() === '```').length).toBe(1);
+    // Suffix junk stripped
+    expect(result.cleanedText).not.toContain('Terms');
+  });
+
+  it('removes junk outside code block but preserves junk-matching lines inside it', () => {
+    // "Reply", "left a comment", "Copy link" are GitHub removeAnywhereExactLines.
+    // Outside a code block they are removed; inside they must be kept.
+    const rawText = `
+# PR title
+Reply
+\`\`\`python
+Reply
+left a comment
+Copy link
+print("hello")
+\`\`\`
+Copy link
+    `;
+    const result = cleanText({ rawText, sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    // Lines inside the code block preserved
+    const codeSection = result.cleanedText.slice(
+      result.cleanedText.indexOf('```python'),
+      result.cleanedText.lastIndexOf('```') + 3,
+    );
+    expect(codeSection).toContain('Reply');
+    expect(codeSection).toContain('left a comment');
+    expect(codeSection).toContain('Copy link');
+    // The same "Reply" and "Copy link" outside the code block are removed
+    const beforeCode = result.cleanedText.slice(0, result.cleanedText.indexOf('```python'));
+    expect(beforeCode).not.toContain('Reply');
+    const afterCode = result.cleanedText.slice(result.cleanedText.lastIndexOf('```') + 3);
+    expect(afterCode).not.toContain('Copy link');
+  });
+
+  it('handles multiple code blocks with junk between them', () => {
+    const rawText = `
+# Docs
+\`\`\`js
+const a = 1;
+\`\`\`
+Advertisement
+\`\`\`ts
+const b: number = 2;
+\`\`\`
+    `;
+    const result = cleanText({ rawText, sourceTypeHint: 'generic' }, GenericRuleSet);
+    expect(result.cleanedText).toContain('```js');
+    expect(result.cleanedText).toContain('const a = 1;');
+    expect(result.cleanedText).toContain('```ts');
+    expect(result.cleanedText).toContain('const b: number = 2;');
+    // Junk between the two blocks is removed
+    expect(result.cleanedText).not.toContain('Advertisement');
+  });
+
+  it('unclosed code block preserves all subsequent lines', () => {
+    // If a code fence is never closed, every line after it should be kept as-is,
+    // even if those lines would otherwise match removal rules.
+    const rawText = `
+# Title
+Intro text
+\`\`\`python
+import os
+left a comment
+Reply
+Copy link
+    `;
+    const result = cleanText({ rawText, sourceTypeHint: 'generic' }, GenericRuleSet);
+    expect(result.cleanedText).toContain('```python');
+    expect(result.cleanedText).toContain('import os');
+    // These would normally be removed by removeAnywhereExactLines but are inside
+    // the unclosed code block so they must be preserved.
+    expect(result.cleanedText).toContain('left a comment');
+    expect(result.cleanedText).toContain('Reply');
+    expect(result.cleanedText).toContain('Copy link');
+  });
+
+  it('trimPrefix stops at an opening code fence', () => {
+    const lines = ['Skip to content', 'Navigation Menu', '```javascript', 'const x = 1;', '```'];
+    const result = trimPrefix(lines, GitHubRuleSet);
+    // Everything from the fence onwards must survive
+    expect(result[0]).toBe('```javascript');
+    expect(result).toContain('const x = 1;');
+    expect(result[result.length - 1]).toBe('```');
+  });
+
+  it('trimSuffix stops at a closing code fence', () => {
+    const lines = ['Real content', '```js', 'const y = 2;', '```', 'Terms', 'Privacy'];
+    const result = trimSuffix(lines, GitHubRuleSet);
+    // Junk after the closing fence removed
+    expect(result).not.toContain('Terms');
+    expect(result).not.toContain('Privacy');
+    // The fence and its content must survive
+    expect(result).toContain('```js');
+    expect(result).toContain('const y = 2;');
+    expect(result[result.length - 1]).toBe('```');
+  });
+
+  it('standalone +N and -N diff-stat lines outside code block are removed by GitHub rules', () => {
+    const lines = [
+      '```diff',
+      '+1',
+      '-1',
+      '```',
+      '+200',
+      '-95',
+    ];
+    const result = cleanMiddle(lines, GitHubRuleSet);
+    // Inside the code block: preserved
+    expect(result).toContain('+1');
+    expect(result).toContain('-1');
+    // Outside: stripped
+    expect(result).not.toContain('+200');
+    expect(result).not.toContain('-95');
   });
 });
 
@@ -609,6 +767,29 @@ Contact
     expect(result.cleanedText).not.toContain('⚠️ Outside diff range comments (1)');
     expect(result.cleanedText).not.toContain('Useful? React with 👍 / 👎.');
     expect(result.cleanedText).not.toContain('@voku\tReply...');
+    expect(result.cleanedText).not.toMatch(/^\+142$/m);
+    expect(result.cleanedText).not.toMatch(/^-15$/m);
+    expect(result.cleanedText).not.toContain('Mention @copilot in a comment to make changes to this pull request.');
+    // Additional assertions discovered via static analysis of real PR output
+    expect(result.cleanedText).not.toContain('Conversation');
+    expect(result.cleanedText).not.toContain('Codex Task');
+    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).not.toContain('Release Notes');
+    expect(result.cleanedText).not.toContain('Sequence Diagram(s)');
+    expect(result.cleanedText).not.toContain('Poem');
+    expect(result.cleanedText).not.toContain('🚥 Pre-merge checks');
+    expect(result.cleanedText).not.toContain('🎯 3 (Moderate)');
+    expect(result.cleanedText).not.toContain('🤖 Hi @voku');
+    expect(result.cleanedText).not.toContain('P2 Badge Set gesture delegate only after CPU fallback succeeds');
+    expect(result.cleanedText).not.toContain('Comment on lines +146 to 149');
+    expect(result.cleanedText).not.toContain('Some comments are outside the diff');
+    expect(result.cleanedText).not.toContain('CodeRabbit');
+    // Standalone @handle lines (nav chrome) must be removed
+    expect(result.cleanedText).not.toMatch(/^@coderabbitai$/m);
+    expect(result.cleanedText).not.toMatch(/^@github-actions$/m);
+    expect(result.cleanedText).not.toMatch(/^@chatgpt-codex-connector$/m);
+    // Short commit SHAs must be removed
+    expect(result.cleanedText).not.toMatch(/^54358d6$/m);
   });
 
   it('does not destroy legitimate user content (blind spot fix)', () => {
@@ -967,5 +1148,831 @@ Do not share my personal information
     expect(result.cleanedText).not.toContain('⚠️ Outside diff range comments (1)');
     expect(result.cleanedText).not.toContain('Useful? React with 👍 / 👎.');
     expect(result.cleanedText).not.toContain('@voku\tReply...');
+    expect(result.cleanedText).not.toMatch(/^\+200$/m);
+    expect(result.cleanedText).not.toMatch(/^-8$/m);
+    expect(result.cleanedText).not.toContain('Mention @copilot in a comment to make changes to this pull request.');
+    expect(result.cleanedText).not.toContain('1 participant');
+    // Additional assertions discovered via static analysis of real PR output
+    expect(result.cleanedText).not.toContain('Conversation');
+    expect(result.cleanedText).not.toContain('Codex Task');
+    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).not.toContain('Release Notes');
+    expect(result.cleanedText).not.toContain('Sequence Diagram(s)');
+    expect(result.cleanedText).not.toContain('🤖 Hi @voku');
+    expect(result.cleanedText).not.toContain('P1 Badge Exclude default examples from held-out evaluation');
+    expect(result.cleanedText).not.toContain('Comment on lines +470 to +474');
+    expect(result.cleanedText).not.toContain('CodeRabbit');
+    // Standalone @handle lines must be removed
+    expect(result.cleanedText).not.toMatch(/^@coderabbitai$/m);
+    expect(result.cleanedText).not.toMatch(/^@github-actions$/m);
+    expect(result.cleanedText).not.toMatch(/^@review-assist$/m);
+    expect(result.cleanedText).not.toMatch(/^@chatgpt-codex-connector$/m);
+    // Short commit SHAs must be removed
+    expect(result.cleanedText).not.toMatch(/^3721bd8$/m);
+  });
+});
+
+describe('GitHub PR — Static Analysis Pattern Coverage', () => {
+  // Tests derived from line-by-line static analysis of real PR page dumps.
+  // Each test targets a specific junk pattern found to survive without rules.
+
+  it('removes "Conversation" tab header', () => {
+    const result = cleanText({ rawText: 'Conversation\n# PR title\nSome content', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Conversation');
+    expect(result.cleanedText).toContain('# PR title');
+  });
+
+  it('removes "Codex Task" label', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\nCodex Task\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Codex Task');
+    expect(result.cleanedText).toContain('# PR');
+  });
+
+  it('removes "Summary by CodeRabbit" section header', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\nSummary by CodeRabbit\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
+  });
+
+  it('removes "Release Notes" standalone CodeRabbit section header', () => {
+    const result = cleanText({ rawText: '# PR\nRelease Notes\nNew content', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Release Notes');
+  });
+
+  it('removes "Sequence Diagram(s)" section header', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\nSequence Diagram(s)\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Sequence Diagram(s)');
+  });
+
+  it('removes "Poem" header and does not corrupt poem content', () => {
+    // The "Poem" label itself is removed; the poem lines below it are
+    // generic text the engine cannot distinguish from real content.
+    const result = cleanText({ rawText: '# PR\nPoem\n🐰 A hop, skip, and delegate trace!\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Poem');
+  });
+
+  it('removes "Some comments are outside the diff..." boilerplate', () => {
+    const result = cleanText({
+      rawText: "# PR\nSome content\nSome comments are outside the diff and can't be posted inline due to platform limitations.\n",
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain("Some comments are outside the diff");
+  });
+
+  it('removes "CodeRabbit" standalone bot name', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\nCodeRabbit\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('CodeRabbit');
+  });
+
+  it('removes 🚥 Pre-merge checks summary line', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\n🚥 Pre-merge checks | ✅ 3\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Pre-merge checks');
+  });
+
+  it('removes 🎯 CodeRabbit review effort value line', () => {
+    const result = cleanText({ rawText: '# PR\nEstimated code review effort\n🎯 3 (Moderate) | ⏱️ ~22 minutes\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('🎯 3 (Moderate)');
+    expect(result.cleanedText).not.toContain('Estimated code review effort');
+  });
+
+  it('removes GitHub Actions bot acknowledgment line', () => {
+    const result = cleanText({
+      rawText: '# PR\nSome content\n🤖 Hi @voku, I\'ve received your request, and I\'m working on it now! You can track my progress in the logs for more details.\n',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('🤖 Hi @voku');
+  });
+
+  it('removes tab-less @handle Reply... button variant', () => {
+    // When copy-pasting from GitHub the tab separator between @user and "Reply..."
+    // is sometimes dropped, producing "@userReply..." with no whitespace.
+    const result = cleanText({ rawText: '# PR\nSome content\n@vokuReply...\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('@vokuReply...');
+  });
+
+  it('removes Codex/review priority badge lines (P1, P2)', () => {
+    const result = cleanText({
+      rawText: '# PR\nP2 Badge Set gesture delegate only after CPU fallback succeeds\nP1 Badge Exclude default examples from held-out evaluation\nSome content',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('P2 Badge');
+    expect(result.cleanedText).not.toContain('P1 Badge');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes standalone @handle lines (bot and user nav chrome)', () => {
+    // Standalone @handle lines appear in GitHub PR sidebars (reviewer pills,
+    // assignee lists, notification mentions). They must be removed.
+    // NOTE: content must precede the @handle section in the input — once
+    // the suffix trimmer finds the @handles trailing at the end it cuts them.
+    const result = cleanText({
+      rawText: '# PR\nSome content\n@coderabbitai\n@github-actions\n@review-assist',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toMatch(/^@coderabbitai$/m);
+    expect(result.cleanedText).not.toMatch(/^@github-actions$/m);
+    expect(result.cleanedText).not.toMatch(/^@review-assist$/m);
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('preserves @handle when it appears mid-sentence (not a standalone line)', () => {
+    // A line containing @mention embedded in text must NOT be removed.
+    const result = cleanText({
+      rawText: '# PR\nThanks to @voku for the fix.\nAnother @reviewer approved it.\n',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).toContain('Thanks to @voku for the fix.');
+    expect(result.cleanedText).toContain('Another @reviewer approved it.');
+  });
+
+  it('removes short commit SHAs (7-char hex) as standalone lines', () => {
+    const result = cleanText({
+      rawText: '# PR\n54358d6\n3721bd8\nSome content',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toMatch(/^54358d6$/m);
+    expect(result.cleanedText).not.toMatch(/^3721bd8$/m);
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes Comment on lines with + on first number only (real GitHub variant)', () => {
+    // GitHub sometimes renders "Comment on lines +146 to 149" (no + on second number).
+    // The original regex required + on both; this was a real blind spot.
+    const result = cleanText({
+      rawText: '# PR\nComment on lines +146 to 149\nComment on lines +532 to +551\nSome content',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Comment on lines +146 to 149');
+    expect(result.cleanedText).not.toContain('Comment on lines +532 to +551');
+    expect(result.cleanedText).toContain('Some content');
+  });
+});
+
+describe('GitHub — Research-Driven Pattern Coverage', () => {
+  // Tests derived from real GitHub Issue, Repo, and Files Changed tab page dumps.
+  // Patterns confirmed by fetching live GitHub pages and running line-by-line analysis.
+
+  // ── Issue / PR page chrome ─────────────────────────────────────────────
+
+  it('removes "Type \'/\' to search" shortcut hint', () => {
+    const result = cleanText({ rawText: "Type '/' to search\n# PR title\nSome content" }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain("Type '/' to search");
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes "Jump to bottom" page navigation', () => {
+    const result = cleanText({ rawText: '# Issue title\nSome content\nJump to bottom' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Jump to bottom');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes "opened this issue" event line', () => {
+    const result = cleanText({ rawText: '# Issue\ndevuser\nopened this issue\nSome content' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('opened this issue');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes "Leave a comment" form label', () => {
+    const result = cleanText({ rawText: '# Issue\nSome content\nLeave a comment' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Leave a comment');
+  });
+
+  it('removes "Lock conversation" and "Delete issue" sidebar actions', () => {
+    const result = cleanText({ rawText: '# Issue\nSome content\nLock conversation\nDelete issue' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Lock conversation');
+    expect(result.cleanedText).not.toContain('Delete issue');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes "Linked pull requests" sidebar section', () => {
+    const result = cleanText({ rawText: '# Issue\nSome content\nLinked pull requests' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Linked pull requests');
+  });
+
+  it('removes "Markdown is supported" and file attach hint', () => {
+    const result = cleanText({
+      rawText: '# Issue\nSome content\nMarkdown is supported\nAttach files by dragging & dropping, selecting or pasting them.',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Markdown is supported');
+    expect(result.cleanedText).not.toContain('Attach files by dragging & dropping');
+  });
+
+  it('removes "Add a comment to start a discussion" empty state', () => {
+    const result = cleanText({ rawText: '# Issue\nSome content\nAdd a comment to start a discussion' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Add a comment to start a discussion');
+  });
+
+  it('removes "You are not currently watching this repository"', () => {
+    const result = cleanText({ rawText: '# Issue\nSome content\nYou are not currently watching this repository' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('You are not currently watching this repository');
+  });
+
+  it('removes "You must be logged in to vote"', () => {
+    const result = cleanText({ rawText: '# Issue\nSome content\nYou must be logged in to vote' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('You must be logged in to vote');
+  });
+
+  it('removes "No issues match the current filter" empty state', () => {
+    const result = cleanText({ rawText: '# Issue list\nFilters\nNo issues match the current filter' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('No issues match the current filter');
+  });
+
+  it('removes "No branches or tags" empty state', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\nDevelopment\nNo branches or tags' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('No branches or tags');
+  });
+
+  it('removes "Label issues and pull requests for new contributors"', () => {
+    const result = cleanText({ rawText: '# Issues\nLabel issues and pull requests for new contributors\nSome content' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Label issues and pull requests for new contributors');
+  });
+
+  // ── Repo sidebar chrome ────────────────────────────────────────────────
+
+  it('removes "Sponsor this project" sidebar link', () => {
+    const result = cleanText({ rawText: '# Repo\nSome content\nSponsor this project' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Sponsor this project');
+  });
+
+  it('removes "No packages published" sidebar empty state', () => {
+    const result = cleanText({ rawText: '# Repo\nSome content\nPackages\nNo packages published' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('No packages published');
+  });
+
+  it('removes "Open in github.dev" and "Open with GitHub Desktop" buttons', () => {
+    const result = cleanText({ rawText: '# Repo\nSome content\nOpen in github.dev\nOpen with GitHub Desktop\nView all files' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Open in github.dev');
+    expect(result.cleanedText).not.toContain('Open with GitHub Desktop');
+    expect(result.cleanedText).not.toContain('View all files');
+  });
+
+  it('removes "View all releases" sidebar link', () => {
+    const result = cleanText({ rawText: '# Repo\nSome content\nView all releases' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('View all releases');
+  });
+
+  it('removes "Nothing to show" empty state', () => {
+    const result = cleanText({ rawText: '# Repo\nSome content\nNothing to show' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Nothing to show');
+  });
+
+  it('removes "Used by N users" sidebar stat', () => {
+    const r1 = cleanText({ rawText: '# Repo\nSome content\nUsed by 47 users' }, GitHubRuleSet);
+    const r2 = cleanText({ rawText: '# Repo\nSome content\nUsed by 3' }, GitHubRuleSet);
+    expect(r1.cleanedText).not.toContain('Used by 47 users');
+    expect(r2.cleanedText).not.toContain('Used by 3');
+    expect(r1.cleanedText).toContain('Some content');
+  });
+
+  it('removes "N contributors" sidebar stat', () => {
+    const result = cleanText({ rawText: '# Repo\nSome content\n3 contributors\n1 contributor' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('3 contributors');
+    expect(result.cleanedText).not.toContain('1 contributor');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  // ── Files Changed tab chrome ───────────────────────────────────────────
+
+  it('removes "Conversations" plural tab label', () => {
+    const result = cleanText({ rawText: '# PR\nConversations\nSome content' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Conversations');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes Files Changed tab bar (space-separated format)', () => {
+    const result = cleanText({
+      rawText: '# PR\nCommits 1\nChecks 24\nFiles changed 3\nSome content',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Commits 1');
+    expect(result.cleanedText).not.toContain('Checks 24');
+    expect(result.cleanedText).not.toContain('Files changed 3');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes "Showing N changed files with N additions and N deletions." diff summary', () => {
+    const r1 = cleanText({ rawText: '# PR\nShowing 3 changed files with 200 additions and 8 deletions.\nSome content' }, GitHubRuleSet);
+    const r2 = cleanText({ rawText: '# PR\nShowing 1 changed file with 1 addition and 0 deletions.\nSome content' }, GitHubRuleSet);
+    expect(r1.cleanedText).not.toContain('Showing 3 changed files');
+    expect(r2.cleanedText).not.toContain('Showing 1 changed file');
+    expect(r1.cleanedText).toContain('Some content');
+  });
+
+  it('removes Files Changed UI controls', () => {
+    const result = cleanText({
+      rawText: '# PR\nFilter changed files\nShow file tree\nHide file tree\nExpand all\nCollapse all\nJump to file\nLoad diff\nSome content',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Filter changed files');
+    expect(result.cleanedText).not.toContain('Show file tree');
+    expect(result.cleanedText).not.toContain('Hide file tree');
+    expect(result.cleanedText).not.toContain('Expand all');
+    expect(result.cleanedText).not.toContain('Collapse all');
+    expect(result.cleanedText).not.toContain('Jump to file');
+    expect(result.cleanedText).not.toContain('Load diff');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes "Viewed" checkbox label and "This file was deleted." diff note', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\nViewed\nThis file was deleted.' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Viewed');
+    expect(result.cleanedText).not.toContain('This file was deleted.');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes "N% of N files viewed" Files Changed progress indicator', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\n50% of 6 files viewed' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('50% of 6 files viewed');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  // ── Relative timestamp completeness ────────────────────────────────────
+
+  it('removes relative timestamps not covered by the digit-based rule', () => {
+    const result = cleanText({
+      rawText: '# PR\nSome content\nyesterday\nlast week\nlast month\nlast year\na minute ago\nan hour ago\na day ago',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('yesterday');
+    expect(result.cleanedText).not.toContain('last week');
+    expect(result.cleanedText).not.toContain('last month');
+    expect(result.cleanedText).not.toContain('last year');
+    expect(result.cleanedText).not.toContain('a minute ago');
+    expect(result.cleanedText).not.toContain('an hour ago');
+    expect(result.cleanedText).not.toContain('a day ago');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  // ── Middle-dot separator (U+00B7) ──────────────────────────────────────
+
+  it('removes "· N comments" middle-dot separator line', () => {
+    const result = cleanText({ rawText: '# Issue\n\u00B7 3 comments\nSome content' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('\u00B7 3 comments');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes standalone middle-dot separator (U+00B7)', () => {
+    const result = cleanText({ rawText: '# Issue\ndevuser\n\u00B7\nedited\nSome content' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('\u00B7');
+  });
+
+  // ── Issue title-change event ────────────────────────────────────────────
+
+  it('removes title-change event lines', () => {
+    const result = cleanText({
+      rawText: '# Issue\ndevuser changed the title Old title New title\nSome content',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('changed the title');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  // ── GitHub auth / sign-in prompts ──────────────────────────────────────
+
+  it('removes GitHub sign-in prompts', () => {
+    const result = cleanText({
+      rawText: '# Issues\nHave a question about this project? Sign up for a free GitHub account to open an issue and contact its maintainers and the community.\nSign up for GitHub\nAlready on GitHub? Sign in to your account\nPick a username\nSome content',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Have a question about this project?');
+    expect(result.cleanedText).not.toContain('Sign up for GitHub');
+    expect(result.cleanedText).not.toContain('Already on GitHub?');
+    expect(result.cleanedText).not.toContain('Pick a username');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes over-dashed "Skip to content" prefix while preserving the PR title', () => {
+    const result = cleanText({
+      rawText: '- - - - - - - - - - - - - - - Skip to content\nvoku\nAmysEcho\nRepository navigation\nCode\nIssues\n12\n(12)\nExpose runtime diagnosability for gesture detector and surface in status/docs/tests',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).toBe('Expose runtime diagnosability for gesture detector and surface in status/docs/tests');
+  });
+
+  it('removes standalone PR header metadata lines from a copied PR page', () => {
+    const result = cleanText({
+      rawText: '#1123\nMerged\nmerged 3 commits into\nmain\nfrom\ncodex/work-on-todos-autonomously\nLines changed: 146 additions &amp; 16 deletions\nSome content',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('#1123');
+    expect(result.cleanedText).not.toContain('Merged');
+    expect(result.cleanedText).not.toContain('merged 3 commits into');
+    expect(result.cleanedText).not.toContain('Lines changed: 146 additions');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('keeps valuable PR body and review details from the raw GitHub sample while dropping obvious chrome', () => {
+    const rawText = `- - - - - - - - - - - - - - - Skip to content
+voku
+AmysEcho
+Repository navigation
+Code
+Issues
+2
+(2)
+Pull requests
+12
+(12)
+Agents
+Discussions
+Actions
+Projects
+Wiki
+Expose runtime diagnosability for gesture detector and surface in status/docs/tests
+#1123
+Merged
+voku
+merged 3 commits into
+main
+from
+codex/work-on-todos-autonomously
+yesterday
++146
+-16
+Lines changed: 146 additions &amp; 16 deletions
+Conversation6 (6)
+Commits3 (3)
+Checks14 (14)
+Files changed9 (9)
+Conversation
+@voku
+Owner
+voku
+commented
+2 days ago
+•
+Motivation
+Reduce time-to-root-cause for MediaPipe/gesture runtime incidents by surfacing backend delegate, module readiness, model URLs, and initialization errors in a single diagnostic snapshot.
+Description
+Added runtime diagnostics to GestureDetector including runtimeDelegates, lastInitializationError, and a new method getRuntimeDiagnostics() that returns delegates, module readiness flags, model URLs, frame count, running state, and last init error.
+Testing
+Ran unit tests for the gesture module (Vitest) including GestureDetector and GestureRecognitionOrchestrator test suites; the updated tests asserting delegate reporting, CPU fallback, last initialization error, and status exposure passed.
+webapp/src/gesture/core/GestureDetector.ts
+Outdated
+Comment on lines +532 to +551
+  getRuntimeDiagnostics(): {
+    running: boolean;
+  } {
+The return type for getRuntimeDiagnostics is complex and duplicated from the internal runtimeDelegates field definition.
+Footer
+© 2026 GitHub, Inc.
+Footer navigation
+Terms
+Privacy`;
+
+    const result = cleanText({
+      rawText,
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+
+    expect(result.cleanedText).not.toContain('Skip to content');
+    expect(result.cleanedText).not.toContain('Repository navigation');
+    expect(result.cleanedText).not.toContain('#1123');
+    expect(result.cleanedText).not.toContain('Merged');
+    expect(result.cleanedText).not.toContain('merged 3 commits into');
+    expect(result.cleanedText).not.toContain('Footer navigation');
+
+    expect(result.cleanedText).toContain('Expose runtime diagnosability for gesture detector and surface in status/docs/tests');
+    expect(result.cleanedText).toContain('Motivation');
+    expect(result.cleanedText).toContain('Description');
+    expect(result.cleanedText).toContain('Testing');
+    expect(result.cleanedText).toContain('getRuntimeDiagnostics(): {');
+    expect(result.cleanedText).toContain('The return type for getRuntimeDiagnostics is complex and duplicated');
+  });
+
+  // ── Preservation guards (no false positives) ───────────────────────────
+
+  it('preserves real diff content even when it looks like a stat line', () => {
+    // A line "Commits 1" in a PR diff context should be removed — but if
+    // the engineer writes "I reviewed Commits 1 through 5", that full sentence
+    // is never a standalone line and is preserved by the engine.
+    const result = cleanText({
+      rawText: '# PR\nCommits 1\nI reviewed commits 1 through 5 in detail.\nShowing 3 changed files with 200 additions and 8 deletions.',
+    }, GitHubRuleSet);
+    // The standalone "Commits 1" line is removed
+    expect(result.cleanedText.split('\n')).not.toContain('Commits 1');
+    // The sentence remains
+    expect(result.cleanedText).toContain('I reviewed commits 1 through 5 in detail.');
+    // The diff summary line is removed
+    expect(result.cleanedText).not.toContain('Showing 3 changed files');
+  });
+
+  // ── Block-aware removal ─────────────────────────────────────────────────
+
+  it('removes a CodeRabbit review table block (Cohort → blank line)', () => {
+    const result = cleanText({
+      rawText: [
+        'Motivation',
+        'Fix the bug in auth.',
+        'Cohort / File(s)\tSummary',
+        'src/auth.ts\tFixed token refresh logic',
+        'src/api.ts\tUpdated error handling',
+        '',
+        'Description',
+        'This PR fixes token refresh.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Cohort / File(s)');
+    expect(result.cleanedText).not.toContain('Fixed token refresh logic');
+    expect(result.cleanedText).toContain('Motivation');
+    expect(result.cleanedText).toContain('Description');
+    expect(result.cleanedText).toContain('This PR fixes token refresh.');
+  });
+
+  it('removes bot review header blocks ([bot] line → blank line)', () => {
+    const result = cleanText({
+      rawText: [
+        'Description',
+        'This is the PR description.',
+        '',
+        'review-assist[bot]',
+        'review-assist bot reviewed 1 hour ago',
+        'Contributor',
+        'review-assist bot',
+        'left a comment',
+        'Code Review',
+        '',
+        'The code looks good but needs more tests.',
+        '',
+        'However, the auth module should also handle token expiry.',
+        'Consider adding a retry mechanism for failed requests.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('review-assist[bot]');
+    expect(result.cleanedText).toContain('This is the PR description.');
+    expect(result.cleanedText).toContain('The code looks good but needs more tests.');
+    expect(result.cleanedText).toContain('Consider adding a retry mechanism for failed requests.');
+  });
+
+  // ── Mid-body noise removal (blind-spot analysis findings) ───────────────
+
+  it('removes standalone severity labels (medium, low, high, critical)', () => {
+    const result = cleanText({
+      rawText: 'Description\nThis is a bug.\nmedium\nThe fix is simple.',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('medium');
+    expect(result.cleanedText).toContain('This is a bug.');
+    expect(result.cleanedText).toContain('The fix is simple.');
+  });
+
+  it('removes PR status banners and merge metadata', () => {
+    const result = cleanText({
+      rawText: [
+        'Fix authentication bug',
+        'The pull request is closed.',
+        'Caution',
+        'Review failed',
+        'Changes requested',
+        'This is the actual description.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('The pull request is closed.');
+    expect(result.cleanedText).not.toContain('Caution');
+    expect(result.cleanedText).not.toContain('Review failed');
+    expect(result.cleanedText).not.toContain('Changes requested');
+    expect(result.cleanedText).toContain('Fix authentication bug');
+    expect(result.cleanedText).toContain('This is the actual description.');
+  });
+
+  it('removes review events (approved, requested changes, dismissed)', () => {
+    const result = cleanText({
+      rawText: [
+        'Description',
+        'voku approved these changes',
+        'alice requested changes',
+        'bob dismissed stale review',
+        'The actual review comment.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('approved these changes');
+    expect(result.cleanedText).not.toContain('requested changes');
+    expect(result.cleanedText).not.toContain('dismissed stale review');
+    expect(result.cleanedText).toContain('The actual review comment.');
+  });
+
+  it('removes merge/branch lifecycle events', () => {
+    const result = cleanText({
+      rawText: [
+        '# PR Title',
+        'voku merged commit abc1234 into main',
+        'voku deleted the feature/auth branch',
+        'alice added 3 commits last month',
+        'bob force-pushed the main branch from abc1234 to def5678',
+        'The actual content.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('merged commit');
+    expect(result.cleanedText).not.toContain('deleted the');
+    expect(result.cleanedText).not.toContain('added 3 commits');
+    expect(result.cleanedText).not.toContain('force-pushed');
+    expect(result.cleanedText).toContain('# PR Title');
+    expect(result.cleanedText).toContain('The actual content.');
+  });
+
+  it('removes merge UI controls', () => {
+    const result = cleanText({
+      rawText: [
+        'Description of changes.',
+        'Squash and merge',
+        'Confirm squash and merge',
+        'This branch is up to date with the base branch.',
+        'All checks have passed',
+        'Merging is blocked',
+        'The fix addresses the auth issue.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Squash and merge');
+    expect(result.cleanedText).not.toContain('Confirm squash and merge');
+    expect(result.cleanedText).not.toContain('This branch is up to date');
+    expect(result.cleanedText).not.toContain('All checks have passed');
+    expect(result.cleanedText).not.toContain('Merging is blocked');
+    expect(result.cleanedText).toContain('Description of changes.');
+    expect(result.cleanedText).toContain('The fix addresses the auth issue.');
+  });
+
+  it('removes cross-reference events', () => {
+    const result = cleanText({
+      rawText: [
+        '# Issue',
+        'This was referenced Oct 3, 2025',
+        'alice referenced this pull request',
+        'This comment was marked as resolved',
+        'Actual discussion content.',
+      ].join('\n'),
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('This was referenced');
+    expect(result.cleanedText).not.toContain('referenced this pull request');
+    expect(result.cleanedText).not.toContain('marked as resolved');
+    expect(result.cleanedText).toContain('Actual discussion content.');
+  });
+
+  // ── Golden fixture integration test ─────────────────────────────────────
+  // This is the "single most uncomfortable test" from the blind-spot analysis:
+  // a real full-page PR paste, cleaned and compared to a known-good output.
+
+  it('golden fixture: cleans a complete real PR paste to expected output', () => {
+    // Simulated full-page copy-paste of a GitHub PR (header + body + sidebar + footer)
+    const fullPagePaste = [
+      '- - - - - - - - - - - - - - - Skip to content',
+      'voku',
+      'AmysEcho',
+      'Repository navigation',
+      'Code',
+      'Issues',
+      '2',
+      '(2)',
+      'Pull requests',
+      '12',
+      '(12)',
+      'Agents',
+      'Discussions',
+      'Actions',
+      'Projects',
+      'Wiki',
+      // PR title
+      'Expose runtime diagnosability for gesture detector and surface in status/docs/tests',
+      // PR metadata
+      '#1123',
+      'Merged',
+      'voku',
+      'merged 3 commits into',
+      'main',
+      'from',
+      'codex/work-on-todos-autonomously',
+      'yesterday',
+      '+146',
+      '-16',
+      'Lines changed: 146 additions &amp; 16 deletions',
+      'Conversation6 (6)',
+      'Commits3 (3)',
+      'Checks14 (14)',
+      'Files changed9 (9)',
+      'Conversation',
+      '@voku',
+      'Owner',
+      'voku',
+      'commented',
+      '2 days ago',
+      '\u2022',
+      // PR body — the content that matters
+      'Motivation',
+      'Reduce time-to-root-cause for MediaPipe/gesture runtime incidents.',
+      '',
+      'Description',
+      'Added runtime diagnostics to GestureDetector including runtimeDelegates.',
+      '',
+      'Testing',
+      'Ran unit tests for the gesture module.',
+      '',
+      // Bot review block
+      'review-assist[bot]',
+      'review-assist bot reviewed 1 hour ago',
+      'Contributor',
+      'review-assist bot',
+      'left a comment',
+      'Code Review',
+      '',
+      'This pull request implements runtime diagnosability enhancements.',
+      '',
+      // CodeRabbit table
+      'Codex Task',
+      'Summary by CodeRabbit',
+      'Release Notes',
+      '',
+      // Inline review comment
+      'webapp/src/gesture/core/GestureDetector.ts',
+      'Outdated',
+      'Comment on lines +532 to +551',
+      '  getRuntimeDiagnostics(): {',
+      '    running: boolean;',
+      '  } {',
+      'The return type is complex and duplicated.',
+      '',
+      // Merge UI noise
+      'Caution',
+      'Review failed',
+      'The pull request is closed.',
+      'All checks have passed',
+      'Squash and merge',
+      'Confirm squash and merge',
+      '',
+      // Sidebar
+      'Reviewers',
+      '+1 more reviewer',
+      'Assignees',
+      'No one\u2014',
+      'Labels',
+      'None yet',
+      'Projects',
+      'Milestone',
+      'No milestone',
+      'Development',
+      'Successfully merging this pull request may close these issues.',
+      '',
+      // Footer
+      'Footer',
+      '\u00A9 2026 GitHub, Inc.',
+      'Footer navigation',
+      'Terms',
+      'Privacy',
+    ].join('\n');
+
+    const result = cleanText({
+      rawText: fullPagePaste,
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+
+    // ── Must be present (the meaningful content) ─────────────────────────
+    expect(result.cleanedText).toContain('Expose runtime diagnosability for gesture detector and surface in status/docs/tests');
+    expect(result.cleanedText).toContain('Motivation');
+    expect(result.cleanedText).toContain('Reduce time-to-root-cause for MediaPipe/gesture runtime incidents.');
+    expect(result.cleanedText).toContain('Description');
+    expect(result.cleanedText).toContain('Added runtime diagnostics to GestureDetector including runtimeDelegates.');
+    expect(result.cleanedText).toContain('Testing');
+    expect(result.cleanedText).toContain('Ran unit tests for the gesture module.');
+    expect(result.cleanedText).toContain('This pull request implements runtime diagnosability enhancements.');
+    // Code review comment preserved
+    expect(result.cleanedText).toContain('webapp/src/gesture/core/GestureDetector.ts');
+    expect(result.cleanedText).toContain('getRuntimeDiagnostics(): {');
+    expect(result.cleanedText).toContain('The return type is complex and duplicated.');
+
+    // ── Must NOT be present (the noise) ──────────────────────────────────
+    // Header chrome
+    expect(result.cleanedText).not.toContain('Skip to content');
+    expect(result.cleanedText).not.toContain('Repository navigation');
+    expect(result.cleanedText).not.toContain('AmysEcho');
+    // PR metadata
+    expect(result.cleanedText).not.toContain('#1123');
+    expect(result.cleanedText).not.toContain('merged 3 commits into');
+    expect(result.cleanedText).not.toContain('Lines changed: 146 additions');
+    expect(result.cleanedText).not.toContain('Conversation6 (6)');
+    // Bot review block header
+    expect(result.cleanedText).not.toContain('review-assist[bot]');
+    // CodeRabbit metadata
+    expect(result.cleanedText).not.toContain('Codex Task');
+    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).not.toContain('Release Notes');
+    // Merge UI noise
+    expect(result.cleanedText).not.toContain('Caution');
+    expect(result.cleanedText).not.toContain('Review failed');
+    expect(result.cleanedText).not.toContain('The pull request is closed.');
+    expect(result.cleanedText).not.toContain('All checks have passed');
+    expect(result.cleanedText).not.toContain('Squash and merge');
+    // Sidebar
+    expect(result.cleanedText).not.toContain('No one\u2014');
+    expect(result.cleanedText).not.toContain('No milestone');
+    // Footer
+    expect(result.cleanedText).not.toContain('Footer navigation');
+    expect(result.cleanedText).not.toContain('\u00A9 2026 GitHub, Inc.');
+    expect(result.cleanedText).not.toContain('Terms');
+
+    // ── Line count sanity check ──────────────────────────────────────────
+    // The meaningful content is approximately 15-25 lines. If cleaned output
+    // has more than 35 non-blank lines, too much noise is leaking through.
+    const nonBlankLines = result.cleanedText.split('\n').filter(l => l.trim() !== '');
+    expect(nonBlankLines.length).toBeLessThanOrEqual(35);
+    expect(nonBlankLines.length).toBeGreaterThanOrEqual(5);
   });
 });

@@ -184,10 +184,18 @@ object Engine {
 
     private fun normalizeMarkdownBody(lines: List<String>, type: SourceType): List<String> {
         if (type == SourceType.CHAT) {
+            var inCodeBlock = false
             return lines.map { line ->
                 val trimmed = line.trim()
                 if (trimmed.isEmpty()) {
                     return@map ""
+                }
+                if (trimmed.startsWith("```")) {
+                    inCodeBlock = !inCodeBlock
+                    return@map trimmed
+                }
+                if (inCodeBlock) {
+                    return@map trimmed
                 }
                 if (trimmed.startsWith("- ") ||
                     trimmed.startsWith("* ") ||

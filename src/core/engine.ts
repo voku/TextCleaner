@@ -1,4 +1,4 @@
-import { CleanedResult, CleanupRuleSet, RawInput, SourceType } from './types';
+import { BlockPattern, CleanedResult, CleanupRuleSet, RawInput, SourceType } from './types';
 import { detectSourceType } from './detector';
 import { GenericRuleSet } from './rules/generic';
 import { GitHubRuleSet } from './rules/github';
@@ -54,7 +54,7 @@ export function trimPrefix(lines: string[], ruleSet: CleanupRuleSet): string[] {
         break;
       }
       unrecognizedCount++;
-      if (unrecognizedCount > 3) {
+      if (unrecognizedCount > 5) {
         break;
       }
     }
@@ -89,7 +89,7 @@ export function trimSuffix(lines: string[], ruleSet: CleanupRuleSet): string[] {
         break;
       }
       unrecognizedCount++;
-      if (unrecognizedCount > 3) {
+      if (unrecognizedCount > 5) {
         break;
       }
     }
@@ -99,6 +99,82 @@ export function trimSuffix(lines: string[], ruleSet: CleanupRuleSet): string[] {
     return lines.slice(0, firstJunkIndex);
   }
   return lines;
+}
+
+/**
+ * Remove structural blocks identified by start/end marker patterns.
+ * This enables removing multi-line sections (e.g. CodeRabbit review tables,
+ * bot review sections) that individual line matching cannot catch.
+ */
+export function removeBlocks(lines: string[], ruleSet: CleanupRuleSet): string[] {
+  const patterns = ruleSet.blockPatterns;
+  if (!patterns || patterns.length === 0) {
+    return lines;
+  }
+
+  const result: string[] = [];
+  let inCodeBlock = false;
+  let i = 0;
+
+  while (i < lines.length) {
+    const trimmed = lines[i].trim();
+
+    // Track code blocks — never remove inside them
+    if (trimmed.startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      result.push(lines[i]);
+      i++;
+      continue;
+    }
+
+    if (inCodeBlock) {
+      result.push(lines[i]);
+      i++;
+      continue;
+    }
+
+    // Try to match a block start
+    let matched = false;
+    for (const bp of patterns) {
+      if (bp.start.test(trimmed)) {
+        const maxLen = bp.maxLines ?? 80;
+        // Found a block start — scan forward for the end
+        if (bp.end) {
+          let j = i + 1;
+          let found = false;
+          while (j < lines.length && (j - i) < maxLen) {
+            if (bp.end.test(lines[j].trim())) {
+              found = true;
+              j++; // skip the end line too
+              break;
+            }
+            j++;
+          }
+          if (found) {
+            i = j; // skip entire block
+            matched = true;
+          }
+          // If end not found within maxLines, don't remove anything
+        } else {
+          // No end pattern — block extends to next blank line
+          let j = i + 1;
+          while (j < lines.length && (j - i) < maxLen && lines[j].trim() !== '') {
+            j++;
+          }
+          i = j; // skip block (blank line itself will be kept on next iteration)
+          matched = true;
+        }
+        break;
+      }
+    }
+
+    if (!matched) {
+      result.push(lines[i]);
+      i++;
+    }
+  }
+
+  return result;
 }
 
 export function cleanMiddle(lines: string[], ruleSet: CleanupRuleSet, skipIntensive: boolean = false): string[] {
@@ -187,10 +263,20 @@ function formatSourceTypeLabel(type: SourceType): string {
 
 function normalizeMarkdownBody(lines: string[], type: SourceType): string[] {
   if (type === 'chat') {
+    let inCodeBlock = false;
     return lines.map(line => {
       const trimmed = line.trim();
       if (!trimmed) {
         return '';
+      }
+
+      if (trimmed.startsWith('```')) {
+        inCodeBlock = !inCodeBlock;
+        return trimmed;
+      }
+
+      if (inCodeBlock) {
+        return trimmed;
       }
 
       if (
@@ -260,6 +346,7 @@ export function cleanText(input: RawInput, ruleSetOverride?: CleanupRuleSet): Cl
   } else {
     currentLines = trimPrefix(originalLines, ruleSet);
     currentLines = trimSuffix(currentLines, ruleSet);
+    currentLines = removeBlocks(currentLines, ruleSet);
     currentLines = cleanMiddle(currentLines, ruleSet, isLargeText);
     currentLines = collapseBlankLines(currentLines);
   }
