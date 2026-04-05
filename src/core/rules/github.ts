@@ -128,6 +128,16 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Copilot uses AI. Check for mistakes.',
     'Mention @copilot in a comment to make changes to this pull request.',
     'Read all affected files',
+    // Discovered via static analysis of real PR samples
+    'Conversation',
+    'Codex Task',
+    'Summary by CodeRabbit',
+    'Sequence Diagram(s)',
+    'Poem',
+    'Some comments are outside the diff and can\'t be posted inline due to platform limitations.',
+    'Some comments are outside the diff and can\u2019t be posted inline due to platform limitations.',
+    'CodeRabbit',
+    'Release Notes',
   ],
   removeAnywhereContains: [],
   removeAnywhereRegexes: [
@@ -158,7 +168,7 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^wants to merge \d+ commits? into$/i,
     /^.* wants to merge \d+ commits? into .*$/i,
     /^Reviewed commit: [a-f0-9]+$/i,
-    /^Comment on lines \+\d+ to \+\d+$/i,
+    /^Comment on lines \+\d+ to \+?\d+$/i,
     /^⚠️ Outside diff range comments \(\d+\)$/i,
     /^DGS Integration Tests \/ .*$/i,
     /^\d+ (minute|hour|day|month|year)s? ago$/i,
@@ -171,6 +181,14 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^\+\d+$/,
     /^-\d+$/,
     /^\d+ participants?$/i,
+    // Discovered via static analysis of real PR samples
+    /^🚥 Pre-merge checks.*$/,                   // pre-merge checks summary line
+    /^🎯 \d+.*⏱️.*$/,                           // CodeRabbit review effort value
+    /^🤖 Hi @.+/i,                               // GitHub Actions bot acknowledgment
+    /^@.+Reply\.\.\.$/i,                          // tab-less "Reply..." button variant
+    /^P[0-9] Badge .+/i,                          // Codex/review priority badge lines
+    /^@[a-zA-Z0-9][a-zA-Z0-9._-]*$/i,            // standalone @handle lines (nav chrome)
+    /^[a-f0-9]{7,40}$/,                           // short and full commit SHAs
   ],
   preserveRegexes: [
     /^#+ /, // Headings

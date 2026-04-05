@@ -770,6 +770,26 @@ Contact
     expect(result.cleanedText).not.toMatch(/^\+142$/m);
     expect(result.cleanedText).not.toMatch(/^-15$/m);
     expect(result.cleanedText).not.toContain('Mention @copilot in a comment to make changes to this pull request.');
+    // Additional assertions discovered via static analysis of real PR output
+    expect(result.cleanedText).not.toContain('Conversation');
+    expect(result.cleanedText).not.toContain('Codex Task');
+    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).not.toContain('Release Notes');
+    expect(result.cleanedText).not.toContain('Sequence Diagram(s)');
+    expect(result.cleanedText).not.toContain('Poem');
+    expect(result.cleanedText).not.toContain('🚥 Pre-merge checks');
+    expect(result.cleanedText).not.toContain('🎯 3 (Moderate)');
+    expect(result.cleanedText).not.toContain('🤖 Hi @voku');
+    expect(result.cleanedText).not.toContain('P2 Badge Set gesture delegate only after CPU fallback succeeds');
+    expect(result.cleanedText).not.toContain('Comment on lines +146 to 149');
+    expect(result.cleanedText).not.toContain('Some comments are outside the diff');
+    expect(result.cleanedText).not.toContain('CodeRabbit');
+    // Standalone @handle lines (nav chrome) must be removed
+    expect(result.cleanedText).not.toMatch(/^@coderabbitai$/m);
+    expect(result.cleanedText).not.toMatch(/^@github-actions$/m);
+    expect(result.cleanedText).not.toMatch(/^@chatgpt-codex-connector$/m);
+    // Short commit SHAs must be removed
+    expect(result.cleanedText).not.toMatch(/^54358d6$/m);
   });
 
   it('does not destroy legitimate user content (blind spot fix)', () => {
@@ -1132,5 +1152,157 @@ Do not share my personal information
     expect(result.cleanedText).not.toMatch(/^-8$/m);
     expect(result.cleanedText).not.toContain('Mention @copilot in a comment to make changes to this pull request.');
     expect(result.cleanedText).not.toContain('1 participant');
+    // Additional assertions discovered via static analysis of real PR output
+    expect(result.cleanedText).not.toContain('Conversation');
+    expect(result.cleanedText).not.toContain('Codex Task');
+    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).not.toContain('Release Notes');
+    expect(result.cleanedText).not.toContain('Sequence Diagram(s)');
+    expect(result.cleanedText).not.toContain('🤖 Hi @voku');
+    expect(result.cleanedText).not.toContain('P1 Badge Exclude default examples from held-out evaluation');
+    expect(result.cleanedText).not.toContain('Comment on lines +470 to +474');
+    expect(result.cleanedText).not.toContain('CodeRabbit');
+    // Standalone @handle lines must be removed
+    expect(result.cleanedText).not.toMatch(/^@coderabbitai$/m);
+    expect(result.cleanedText).not.toMatch(/^@github-actions$/m);
+    expect(result.cleanedText).not.toMatch(/^@review-assist$/m);
+    expect(result.cleanedText).not.toMatch(/^@chatgpt-codex-connector$/m);
+    // Short commit SHAs must be removed
+    expect(result.cleanedText).not.toMatch(/^3721bd8$/m);
+  });
+});
+
+describe('GitHub PR — Static Analysis Pattern Coverage', () => {
+  // Tests derived from line-by-line static analysis of real PR page dumps.
+  // Each test targets a specific junk pattern found to survive without rules.
+
+  it('removes "Conversation" tab header', () => {
+    const result = cleanText({ rawText: 'Conversation\n# PR title\nSome content', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Conversation');
+    expect(result.cleanedText).toContain('# PR title');
+  });
+
+  it('removes "Codex Task" label', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\nCodex Task\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Codex Task');
+    expect(result.cleanedText).toContain('# PR');
+  });
+
+  it('removes "Summary by CodeRabbit" section header', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\nSummary by CodeRabbit\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
+  });
+
+  it('removes "Release Notes" standalone CodeRabbit section header', () => {
+    const result = cleanText({ rawText: '# PR\nRelease Notes\nNew content', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Release Notes');
+  });
+
+  it('removes "Sequence Diagram(s)" section header', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\nSequence Diagram(s)\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Sequence Diagram(s)');
+  });
+
+  it('removes "Poem" header and does not corrupt poem content', () => {
+    // The "Poem" label itself is removed; the poem lines below it are
+    // generic text the engine cannot distinguish from real content.
+    const result = cleanText({ rawText: '# PR\nPoem\n🐰 A hop, skip, and delegate trace!\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Poem');
+  });
+
+  it('removes "Some comments are outside the diff..." boilerplate', () => {
+    const result = cleanText({
+      rawText: "# PR\nSome content\nSome comments are outside the diff and can't be posted inline due to platform limitations.\n",
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain("Some comments are outside the diff");
+  });
+
+  it('removes "CodeRabbit" standalone bot name', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\nCodeRabbit\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('CodeRabbit');
+  });
+
+  it('removes 🚥 Pre-merge checks summary line', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\n🚥 Pre-merge checks | ✅ 3\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Pre-merge checks');
+  });
+
+  it('removes 🎯 CodeRabbit review effort value line', () => {
+    const result = cleanText({ rawText: '# PR\nEstimated code review effort\n🎯 3 (Moderate) | ⏱️ ~22 minutes\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('🎯 3 (Moderate)');
+    expect(result.cleanedText).not.toContain('Estimated code review effort');
+  });
+
+  it('removes GitHub Actions bot acknowledgment line', () => {
+    const result = cleanText({
+      rawText: '# PR\nSome content\n🤖 Hi @voku, I\'ve received your request, and I\'m working on it now! You can track my progress in the logs for more details.\n',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('🤖 Hi @voku');
+  });
+
+  it('removes tab-less @handle Reply... button variant', () => {
+    // When copy-pasting from GitHub the tab separator between @user and "Reply..."
+    // is sometimes dropped, producing "@userReply..." with no whitespace.
+    const result = cleanText({ rawText: '# PR\nSome content\n@vokuReply...\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('@vokuReply...');
+  });
+
+  it('removes Codex/review priority badge lines (P1, P2)', () => {
+    const result = cleanText({
+      rawText: '# PR\nP2 Badge Set gesture delegate only after CPU fallback succeeds\nP1 Badge Exclude default examples from held-out evaluation\nSome content',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('P2 Badge');
+    expect(result.cleanedText).not.toContain('P1 Badge');
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes standalone @handle lines (bot and user nav chrome)', () => {
+    // Standalone @handle lines appear in GitHub PR sidebars (reviewer pills,
+    // assignee lists, notification mentions). They must be removed.
+    // NOTE: content must precede the @handle section in the input — once
+    // the suffix trimmer finds the @handles trailing at the end it cuts them.
+    const result = cleanText({
+      rawText: '# PR\nSome content\n@coderabbitai\n@github-actions\n@review-assist',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toMatch(/^@coderabbitai$/m);
+    expect(result.cleanedText).not.toMatch(/^@github-actions$/m);
+    expect(result.cleanedText).not.toMatch(/^@review-assist$/m);
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('preserves @handle when it appears mid-sentence (not a standalone line)', () => {
+    // A line containing @mention embedded in text must NOT be removed.
+    const result = cleanText({
+      rawText: '# PR\nThanks to @voku for the fix.\nAnother @reviewer approved it.\n',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).toContain('Thanks to @voku for the fix.');
+    expect(result.cleanedText).toContain('Another @reviewer approved it.');
+  });
+
+  it('removes short commit SHAs (7-char hex) as standalone lines', () => {
+    const result = cleanText({
+      rawText: '# PR\n54358d6\n3721bd8\nSome content',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toMatch(/^54358d6$/m);
+    expect(result.cleanedText).not.toMatch(/^3721bd8$/m);
+    expect(result.cleanedText).toContain('Some content');
+  });
+
+  it('removes Comment on lines with + on first number only (real GitHub variant)', () => {
+    // GitHub sometimes renders "Comment on lines +146 to 149" (no + on second number).
+    // The original regex required + on both; this was a real blind spot.
+    const result = cleanText({
+      rawText: '# PR\nComment on lines +146 to 149\nComment on lines +532 to +551\nSome content',
+      sourceTypeHint: 'github_pr',
+    }, GitHubRuleSet);
+    expect(result.cleanedText).not.toContain('Comment on lines +146 to 149');
+    expect(result.cleanedText).not.toContain('Comment on lines +532 to +551');
+    expect(result.cleanedText).toContain('Some content');
   });
 });

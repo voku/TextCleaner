@@ -134,6 +134,16 @@ val GitHubRuleSet = CleanupRuleSet(
         "Copilot uses AI. Check for mistakes.",
         "Mention @copilot in a comment to make changes to this pull request.",
         "Read all affected files",
+        // Discovered via static analysis of real PR samples
+        "Conversation",
+        "Codex Task",
+        "Summary by CodeRabbit",
+        "Sequence Diagram(s)",
+        "Poem",
+        "Some comments are outside the diff and can\u2019t be posted inline due to platform limitations.",
+        "Some comments are outside the diff and can't be posted inline due to platform limitations.",
+        "CodeRabbit",
+        "Release Notes",
     ),
     removeAnywhereContains = emptyList(),
     removeAnywhereRegexes = listOf(
@@ -164,7 +174,7 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^wants to merge \\d+ commits? into$", RegexOption.IGNORE_CASE),
         Regex("^.* wants to merge \\d+ commits? into .*$", RegexOption.IGNORE_CASE),
         Regex("^Reviewed commit: [a-f0-9]+$", RegexOption.IGNORE_CASE),
-        Regex("^Comment on lines \\+\\d+ to \\+\\d+$", RegexOption.IGNORE_CASE),
+        Regex("^Comment on lines \\+\\d+ to \\+?\\d+$", RegexOption.IGNORE_CASE),
         Regex("^\u26A0\uFE0F Outside diff range comments \\(\\d+\\)$", RegexOption.IGNORE_CASE),
         Regex("^DGS Integration Tests / .*$", RegexOption.IGNORE_CASE),
         Regex("^\\d+ (minute|hour|day|month|year)s? ago$", RegexOption.IGNORE_CASE),
@@ -177,6 +187,14 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^\\+\\d+$"),
         Regex("^-\\d+$"),
         Regex("^\\d+ participants?$", RegexOption.IGNORE_CASE),
+        // Discovered via static analysis of real PR samples
+        Regex("^\uD83D\uDEA5 Pre-merge checks.*$"),              // pre-merge checks summary line
+        Regex("^\uD83C\uDFAF \\d+.*\u23F1\uFE0F.*$"),           // CodeRabbit review effort value
+        Regex("^\uD83E\uDD16 Hi @.+", RegexOption.IGNORE_CASE), // GitHub Actions bot acknowledgment
+        Regex("^@.+Reply\\.\\.\\.$", RegexOption.IGNORE_CASE),   // tab-less "Reply..." button variant
+        Regex("^P[0-9] Badge .+", RegexOption.IGNORE_CASE),      // Codex/review priority badge lines
+        Regex("^@[a-zA-Z0-9][a-zA-Z0-9._-]*$", RegexOption.IGNORE_CASE), // standalone @handle lines
+        Regex("^[a-f0-9]{7,40}$"),                               // short and full commit SHAs
     ),
     preserveRegexes = listOf(
         Regex("^#+ "),                              // Headings

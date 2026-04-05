@@ -810,6 +810,26 @@ Contact
         assertFalse(result.cleanedText.lines().any { it == "+142" })
         assertFalse(result.cleanedText.lines().any { it == "-15" })
         assertFalse(result.cleanedText.contains("Mention @copilot in a comment to make changes to this pull request."))
+        // Additional assertions discovered via static analysis of real PR output
+        assertFalse(result.cleanedText.contains("Conversation"))
+        assertFalse(result.cleanedText.contains("Codex Task"))
+        assertFalse(result.cleanedText.contains("Summary by CodeRabbit"))
+        assertFalse(result.cleanedText.contains("Release Notes"))
+        assertFalse(result.cleanedText.contains("Sequence Diagram(s)"))
+        assertFalse(result.cleanedText.contains("Poem"))
+        assertFalse(result.cleanedText.contains("\uD83D\uDEA5 Pre-merge checks"))
+        assertFalse(result.cleanedText.contains("\uD83C\uDFAF 3 (Moderate)"))
+        assertFalse(result.cleanedText.contains("\uD83E\uDD16 Hi @voku"))
+        assertFalse(result.cleanedText.contains("P2 Badge Set gesture delegate only after CPU fallback succeeds"))
+        assertFalse(result.cleanedText.contains("Comment on lines +146 to 149"))
+        assertFalse(result.cleanedText.contains("Some comments are outside the diff"))
+        assertFalse(result.cleanedText.contains("CodeRabbit"))
+        // Standalone @handle lines must be removed
+        assertFalse(result.cleanedText.lines().any { it == "@coderabbitai" })
+        assertFalse(result.cleanedText.lines().any { it == "@github-actions" })
+        assertFalse(result.cleanedText.lines().any { it == "@chatgpt-codex-connector" })
+        // Short commit SHAs must be removed
+        assertFalse(result.cleanedText.lines().any { it == "54358d6" })
     }
 
     @Test
@@ -1170,5 +1190,178 @@ Do not share my personal information
         assertFalse(result.cleanedText.lines().any { it == "-8" })
         assertFalse(result.cleanedText.contains("Mention @copilot in a comment to make changes to this pull request."))
         assertFalse(result.cleanedText.contains("1 participant"))
+        // Additional assertions discovered via static analysis of real PR output
+        assertFalse(result.cleanedText.contains("Conversation"))
+        assertFalse(result.cleanedText.contains("Codex Task"))
+        assertFalse(result.cleanedText.contains("Summary by CodeRabbit"))
+        assertFalse(result.cleanedText.contains("Release Notes"))
+        assertFalse(result.cleanedText.contains("Sequence Diagram(s)"))
+        assertFalse(result.cleanedText.contains("\uD83E\uDD16 Hi @voku"))
+        assertFalse(result.cleanedText.contains("P1 Badge Exclude default examples from held-out evaluation"))
+        assertFalse(result.cleanedText.contains("CodeRabbit"))
+        assertFalse(result.cleanedText.lines().any { it == "@coderabbitai" })
+        assertFalse(result.cleanedText.lines().any { it == "@github-actions" })
+        assertFalse(result.cleanedText.lines().any { it == "@review-assist" })
+        assertFalse(result.cleanedText.lines().any { it == "@chatgpt-codex-connector" })
+        assertFalse(result.cleanedText.lines().any { it == "3721bd8" })
+    }
+
+    // ── GitHub PR — Static Analysis Pattern Coverage ─────────────────────
+
+    @Test
+    fun `removes Conversation tab header`() {
+        val result = Engine.cleanText(RawInput(rawText = "Conversation\n# PR title\nSome content", sourceTypeHint = SourceType.GITHUB_PR), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Conversation"))
+        assertTrue(result.cleanedText.contains("# PR title"))
+    }
+
+    @Test
+    fun `removes Codex Task label`() {
+        val result = Engine.cleanText(RawInput(rawText = "# PR\nSome content\nCodex Task\n", sourceTypeHint = SourceType.GITHUB_PR), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Codex Task"))
+        assertTrue(result.cleanedText.contains("# PR"))
+    }
+
+    @Test
+    fun `removes Summary by CodeRabbit section header`() {
+        val result = Engine.cleanText(RawInput(rawText = "# PR\nSome content\nSummary by CodeRabbit\n", sourceTypeHint = SourceType.GITHUB_PR), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Summary by CodeRabbit"))
+    }
+
+    @Test
+    fun `removes Release Notes standalone CodeRabbit section header`() {
+        val result = Engine.cleanText(RawInput(rawText = "# PR\nRelease Notes\nNew content", sourceTypeHint = SourceType.GITHUB_PR), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Release Notes"))
+    }
+
+    @Test
+    fun `removes Sequence Diagram(s) section header`() {
+        val result = Engine.cleanText(RawInput(rawText = "# PR\nSome content\nSequence Diagram(s)\n", sourceTypeHint = SourceType.GITHUB_PR), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Sequence Diagram(s)"))
+    }
+
+    @Test
+    fun `removes Poem header`() {
+        val result = Engine.cleanText(RawInput(rawText = "# PR\nPoem\n\uD83D\uDC30 A hop, skip, and delegate trace!\n", sourceTypeHint = SourceType.GITHUB_PR), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Poem"))
+    }
+
+    @Test
+    fun `removes Some comments are outside the diff boilerplate`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# PR\nSome content\nSome comments are outside the diff and can\u2019t be posted inline due to platform limitations.\n",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Some comments are outside the diff"))
+    }
+
+    @Test
+    fun `removes CodeRabbit standalone bot name`() {
+        val result = Engine.cleanText(RawInput(rawText = "# PR\nSome content\nCodeRabbit\n", sourceTypeHint = SourceType.GITHUB_PR), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("CodeRabbit"))
+    }
+
+    @Test
+    fun `removes pre-merge checks summary line`() {
+        val result = Engine.cleanText(RawInput(rawText = "# PR\nSome content\n\uD83D\uDEA5 Pre-merge checks | \u2705 3\n", sourceTypeHint = SourceType.GITHUB_PR), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("Pre-merge checks"))
+    }
+
+    @Test
+    fun `removes CodeRabbit review effort value line`() {
+        val result = Engine.cleanText(RawInput(rawText = "# PR\nEstimated code review effort\n\uD83C\uDFAF 3 (Moderate) | \u23F1\uFE0F ~22 minutes\n", sourceTypeHint = SourceType.GITHUB_PR), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("\uD83C\uDFAF 3 (Moderate)"))
+        assertFalse(result.cleanedText.contains("Estimated code review effort"))
+    }
+
+    @Test
+    fun `removes GitHub Actions bot acknowledgment line`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# PR\nSome content\n\uD83E\uDD16 Hi @voku, I\u2019ve received your request, and I\u2019m working on it now! You can track my progress in the logs for more details.\n",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("\uD83E\uDD16 Hi @voku"))
+    }
+
+    @Test
+    fun `removes tab-less Reply button variant`() {
+        val result = Engine.cleanText(RawInput(rawText = "# PR\nSome content\n@vokuReply...\n", sourceTypeHint = SourceType.GITHUB_PR), ruleSetOverride = GitHubRuleSet)
+        assertFalse(result.cleanedText.contains("@vokuReply..."))
+    }
+
+    @Test
+    fun `removes Codex review priority badge lines`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# PR\nP2 Badge Set gesture delegate only after CPU fallback succeeds\nP1 Badge Exclude default examples from held-out evaluation\nSome content",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("P2 Badge"))
+        assertFalse(result.cleanedText.contains("P1 Badge"))
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes standalone @handle lines`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# PR\nSome content\n@coderabbitai\n@github-actions\n@review-assist",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.lines().any { it == "@coderabbitai" })
+        assertFalse(result.cleanedText.lines().any { it == "@github-actions" })
+        assertFalse(result.cleanedText.lines().any { it == "@review-assist" })
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `preserves @handle embedded in sentence`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# PR\nThanks to @voku for the fix.\nAnother @reviewer approved it.\n",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertTrue(result.cleanedText.contains("Thanks to @voku for the fix."))
+        assertTrue(result.cleanedText.contains("Another @reviewer approved it."))
+    }
+
+    @Test
+    fun `removes short commit SHAs as standalone lines`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# PR\n54358d6\n3721bd8\nSome content",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.lines().any { it == "54358d6" })
+        assertFalse(result.cleanedText.lines().any { it == "3721bd8" })
+        assertTrue(result.cleanedText.contains("Some content"))
+    }
+
+    @Test
+    fun `removes Comment on lines variant without plus on second number`() {
+        val result = Engine.cleanText(
+            RawInput(
+                rawText = "# PR\nComment on lines +146 to 149\nComment on lines +532 to +551\nSome content",
+                sourceTypeHint = SourceType.GITHUB_PR,
+            ),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertFalse(result.cleanedText.contains("Comment on lines +146 to 149"))
+        assertFalse(result.cleanedText.contains("Comment on lines +532 to +551"))
+        assertTrue(result.cleanedText.contains("Some content"))
     }
 }
