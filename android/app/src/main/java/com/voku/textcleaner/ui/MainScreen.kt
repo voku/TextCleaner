@@ -512,6 +512,7 @@ private fun ControlsSection(
                             modifier = Modifier
                                 .weight(1f)
                                 .semantics {
+                                    contentDescription = "Clean text"
                                     stateDescription = if (isCleaning) {
                                         "Cleaning in progress"
                                     } else {
