@@ -2611,4 +2611,27 @@ Do not share my personal information
         assertFalse(result.cleanedText.contains("Run ID:"))
         assertTrue(result.cleanedText.contains("More review text."))
     }
+
+    // ── Demo file integration test ──────────────────────────────────────
+    // Reads the real demo input/expected files from test resources and validates
+    // the engine produces an exact match.  Mirrors engine.test.ts demo test.
+
+    @Test
+    fun `cleans github_example_pull txt to match github_example_pull_clean txt exactly`() {
+        val loader = EngineTest::class.java.classLoader!!
+        val input    = loader.getResourceAsStream("github_example_pull.txt")!!
+            .bufferedReader(Charsets.UTF_8).readText()
+        val expected = loader.getResourceAsStream("github_example_pull_clean.txt")!!
+            .bufferedReader(Charsets.UTF_8).readText()
+
+        val result = Engine.cleanText(
+            RawInput(rawText = input, sourceTypeHint = SourceType.GITHUB_PR),
+            ruleSetOverride = GitHubRuleSet,
+        )
+
+        val got  = result.cleanedText.replace("\r\n", "\n").trimEnd()
+        val want = expected.replace("\r\n", "\n").trimEnd()
+
+        assertEquals(want, got)
+    }
 }
