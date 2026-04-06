@@ -4,7 +4,7 @@ import { cleanText } from './core/engine';
 import engineCode from './core/engine.ts?raw';
 import genericRulesCode from './core/rules/generic.ts?raw';
 import githubRulesCode from './core/rules/github.ts?raw';
-import { RefreshCw, Eraser, FileText, Loader2, Clock, X, Trash2, Code2 } from 'lucide-react';
+import { RefreshCw, Eraser, FileText, Loader2, Clock, X, Trash2, Code2, Smartphone } from 'lucide-react';
 import { CopyButton } from './components/ui/copy-button';
 import { DownloadButton } from './components/ui/download-button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip';
@@ -272,17 +272,29 @@ export default function App() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight text-gray-900">Text Cleaner</h1>
               <p className="text-gray-500">Clean noisy text from GitHub, docs, articles, and chat before sending it to an LLM.</p>
-              <p className="mt-2 text-sm text-gray-600">
-                Production-first web release. Android native work stays on the roadmap for a later phase.{' '}
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <a
+                  href="https://github.com/voku/TextCleaner/releases/tag/android-latest"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                  aria-label="Download Android app"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  Get the Android app
+                </a>
+                <span className="text-sm text-gray-500 hidden sm:inline">
+                  Same cleaning engine — works fully offline, no browser needed.
+                </span>
                 <a
                   href="https://github.com/voku/TextCleaner/"
                   target="_blank"
                   rel="noreferrer"
-                  className="font-medium text-indigo-600 hover:text-indigo-700 underline underline-offset-2"
+                  className="text-sm font-medium text-indigo-600 hover:text-indigo-700 underline underline-offset-2"
                 >
                   Contribute on GitHub
                 </a>
-              </p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <Tooltip>
