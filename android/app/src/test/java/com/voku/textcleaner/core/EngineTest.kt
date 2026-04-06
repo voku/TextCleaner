@@ -2612,9 +2612,11 @@ Do not share my personal information
         assertTrue(result.cleanedText.contains("More review text."))
     }
 
-    // ── Demo file integration test ──────────────────────────────────────
-    // Reads the real demo input/expected files from test resources and validates
-    // the engine produces an exact match.  Mirrors engine.test.ts demo test.
+    // ── Fixture file integration test ──────────────────────────────────────
+    // Reads the real fixture input/expected files from test resources and validates
+    // the engine produces an exact match.  A blind-spot analysis confirmed that
+    // only noise was removed and all useful content is preserved.  The additional
+    // @Test methods below pin the specific patterns that were verified.
 
     @Test
     fun `cleans github_example_pull txt to match github_example_pull_clean txt exactly`() {
@@ -2633,5 +2635,153 @@ Do not share my personal information
         val want = expected.replace("\r\n", "\n").trimEnd()
 
         assertEquals(want, got)
+    }
+
+    // ── Blind-spot analysis: noise removal verification ─────────────────────
+    // Each @Test below was derived from inspecting the demo PR page and
+    // confirming that the labelled pattern is absent from the cleaned output.
+
+    private fun loadCleaned(): String {
+        val loader = EngineTest::class.java.classLoader!!
+        val input = loader.getResourceAsStream("github_example_pull.txt")!!
+            .bufferedReader(Charsets.UTF_8).readText()
+        return Engine.cleanText(
+            RawInput(rawText = input, sourceTypeHint = SourceType.GITHUB_PR),
+            ruleSetOverride = GitHubRuleSet,
+        ).cleanedText
+    }
+
+    @Test
+    fun `blind spot - removes skip to content navigation prefix`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.contains("skip to content"))
+    }
+
+    @Test
+    fun `blind spot - removes repository navigation prefix line`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.contains("repository navigation"))
+    }
+
+    @Test
+    fun `blind spot - removes lines changed diff-stat line`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.contains("lines changed:"))
+    }
+
+    @Test
+    fun `blind spot - removes badge-count lines like Conversation20`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.contains("Conversation20"))
+        assertFalse(cleaned.contains("Commits1"))
+        assertFalse(cleaned.contains("Checks42"))
+        assertFalse(cleaned.contains("Files changed17"))
+    }
+
+    @Test
+    fun `blind spot - removes standalone 7-char commit-hash lines`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.lines().any { it.trim().matches(Regex("[0-9a-f]{7}")) })
+    }
+
+    @Test
+    fun `blind spot - removes bot label-addition event lines`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.contains("added the codex label"))
+        assertFalse(cleaned.contains("ChatGPT Codex Connector"))
+    }
+
+    @Test
+    fun `blind spot - removes Copilot bot introduction comment`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.contains("I've received your request, and I'm working on it now"))
+    }
+
+    @Test
+    fun `blind spot - removes gemini-code-assist bot reviewed header`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.contains("gemini-code-assist bot reviewed"))
+        assertFalse(cleaned.contains("View reviewed changes"))
+    }
+
+    @Test
+    fun `blind spot - removes Commit suggestion and Resolve conversation UI buttons`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.contains("Commit suggestion"))
+        assertFalse(cleaned.contains("Reply..."))
+        assertFalse(cleaned.contains("Resolve conversation"))
+    }
+
+    @Test
+    fun `blind spot - removes Pull request successfully merged and closed merge UI`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.contains("Pull request successfully merged and closed"))
+        assertFalse(cleaned.contains("Delete branch"))
+    }
+
+    @Test
+    fun `blind spot - removes GitHub footer navigation`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.contains("Footer navigation"))
+        assertFalse(cleaned.contains("Do not share my personal information"))
+    }
+
+    @Test
+    fun `blind spot - removes comment-box UI text`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.contains("Add your comment here..."))
+        assertFalse(cleaned.contains("Paste, drop, or click to add files"))
+    }
+
+    // ── Blind-spot analysis: content preservation verification ──────────────
+    // Each @Test below confirms that genuinely useful PR content survived cleaning.
+
+    @Test
+    fun `blind spot - preserves PR title`() {
+        val cleaned = loadCleaned()
+        assertTrue(cleaned.contains("add path-aware local ci runner, integration test profiles, and conditional heavy integration job"))
+    }
+
+    @Test
+    fun `blind spot - preserves Motivation section body`() {
+        val cleaned = loadCleaned()
+        assertTrue(cleaned.contains("Speed up developer feedback by making CI checks path-aware"))
+    }
+
+    @Test
+    fun `blind spot - preserves Description section body`() {
+        val cleaned = loadCleaned()
+        assertTrue(cleaned.contains("./scripts/ci-feedback.sh"))
+    }
+
+    @Test
+    fun `blind spot - preserves Testing section body`() {
+        val cleaned = loadCleaned()
+        assertTrue(cleaned.contains("Ran local CI-style checks using"))
+    }
+
+    @Test
+    fun `blind spot - preserves commit message title`() {
+        val cleaned = loadCleaned()
+        assertTrue(cleaned.contains("Refresh global model artifacts and remove local sqlite state"))
+    }
+
+    @Test
+    fun `blind spot - preserves code snippets within review comments`() {
+        val cleaned = loadCleaned()
+        assertTrue(cleaned.contains("git status --porcelain | awk"))
+    }
+
+    @Test
+    fun `blind spot - preserves reviewer analysis prose`() {
+        val cleaned = loadCleaned()
+        assertTrue(cleaned.contains("Parsing git status --porcelain with awk"))
+        assertTrue(cleaned.contains("This assertion logic significantly weakens the test"))
+    }
+
+    @Test
+    fun `blind spot - preserves CodeRabbit inline-comment analysis text`() {
+        val cleaned = loadCleaned()
+        assertTrue(cleaned.contains("Silently falling back to full can hide config typos"))
     }
 }
