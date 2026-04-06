@@ -2612,12 +2612,11 @@ Do not share my personal information
         assertTrue(result.cleanedText.contains("More review text."))
     }
 
-    // ── Demo file integration test ──────────────────────────────────────────
+    // ── Fixture file integration test ──────────────────────────────────────
     // Reads the real fixture input/expected files from test resources and validates
-    // the engine produces an exact match.  Mirrors engine.test.ts demo test.
-    // A blind-spot analysis confirmed that only noise was removed and all useful
-    // content (PR title, description, review text, code) is preserved.  The
-    // additional @Test methods below pin the specific patterns that were verified.
+    // the engine produces an exact match.  A blind-spot analysis confirmed that
+    // only noise was removed and all useful content is preserved.  The additional
+    // @Test methods below pin the specific patterns that were verified.
 
     @Test
     fun `cleans github_example_pull txt to match github_example_pull_clean txt exactly`() {

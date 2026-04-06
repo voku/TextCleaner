@@ -2645,7 +2645,7 @@ describe('GitHub PR — demo file patterns', () => {
   });
 });
 
-// ── Demo file integration test ────────────────────────────────────────────────
+// ── Fixture file integration test ────────────────────────────────────────────
 // Reads the real fixture input/expected files from __tests__/fixtures/ and
 // validates the engine produces an exact match.  The expected file was generated
 // by running the cleaner on a real GitHub PR page copy-paste and reviewing the
@@ -2654,7 +2654,7 @@ describe('GitHub PR — demo file patterns', () => {
 //   • no useful content (PR title, description, review text, code) was lost
 // The additional it() blocks below pin the specific patterns that were verified.
 
-describe('Demo file — full PR page integration', () => {
+describe('Fixture file — full PR page integration', () => {
   const fixturesDir = resolve(__dirname, 'fixtures');
 
   it('cleans github_example_pull.txt to match github_example_pull_clean.txt exactly', () => {
