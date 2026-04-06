@@ -166,10 +166,12 @@ fun OverlayScreen(
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { onOpenFullApp(initialText) }) {
-                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Open in full app")
+                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Open in full app",
+                            tint = MaterialTheme.colorScheme.onSurface)
                     }
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Dismiss")
+                        Icon(Icons.Default.Close, contentDescription = "Dismiss",
+                            tint = MaterialTheme.colorScheme.onSurface)
                     }
                 }
             }
