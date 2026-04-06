@@ -30,7 +30,7 @@ jobs:
 
       - name: Run Android unit tests and build optimized APK
         working-directory: android
-        run: ./gradlew testCiUnitTest assembleCi --no-daemon
+        run: ./gradlew testDebugUnitTest assembleCi --no-daemon
 
       - name: Rename APK
         run: cp android/app/build/outputs/apk/ci/app-ci.apk TextCleaner.apk
