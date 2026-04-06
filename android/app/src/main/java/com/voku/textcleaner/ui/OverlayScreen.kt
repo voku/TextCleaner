@@ -161,6 +161,7 @@ fun OverlayScreen(
                 Text(
                     text = "Text Cleaner",
                     style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.SemiBold,
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
