@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -97,9 +98,13 @@ import com.voku.textcleaner.ui.theme.CodePanelBorder
 import com.voku.textcleaner.ui.theme.CodePanelContent
 import com.voku.textcleaner.ui.theme.CodePanelTitle
 import com.voku.textcleaner.ui.theme.WarningBackground
+import com.voku.textcleaner.ui.theme.WarningBackgroundDark
 import com.voku.textcleaner.ui.theme.WarningBorder
+import com.voku.textcleaner.ui.theme.WarningBorderDark
 import com.voku.textcleaner.ui.theme.WarningText
+import com.voku.textcleaner.ui.theme.WarningTextDark
 import com.voku.textcleaner.ui.theme.WarningTitle
+import com.voku.textcleaner.ui.theme.WarningTitleDark
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
@@ -493,13 +498,13 @@ private fun ControlsSection(
                             onClick = onLoadSample,
                             modifier = Modifier.weight(1f),
                         ) {
-                            Text("Sample")
+                            Text("Sample", maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         OutlinedButton(
                             onClick = onReset,
                             modifier = Modifier.weight(1f),
                         ) {
-                            Text("Reset")
+                            Text("Reset", maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         Button(
                             onClick = onClean,
@@ -507,6 +512,7 @@ private fun ControlsSection(
                             modifier = Modifier
                                 .weight(1f)
                                 .semantics {
+                                    contentDescription = "Clean text"
                                     stateDescription = if (isCleaning) {
                                         "Cleaning in progress"
                                     } else {
@@ -514,7 +520,7 @@ private fun ControlsSection(
                                     }
                                 },
                         ) {
-                            Text(if (isCleaning) "Cleaning…" else "Clean text")
+                            Text(if (isCleaning) "Cleaning…" else "Clean", maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -749,13 +755,14 @@ private fun ResultSummaryText(result: CleanedResult) {
 
 @Composable
 private fun WarningCard(warnings: List<String>) {
+    val isDark = isSystemInDarkTheme()
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = panelShape,
         colors = CardDefaults.cardColors(
-            containerColor = WarningBackground,
+            containerColor = if (isDark) WarningBackgroundDark else WarningBackground,
         ),
-        border = BorderStroke(1.dp, WarningBorder),
+        border = BorderStroke(1.dp, if (isDark) WarningBorderDark else WarningBorder),
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
@@ -765,13 +772,13 @@ private fun WarningCard(warnings: List<String>) {
                 text = "Warnings",
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold,
-                color = WarningTitle,
+                color = if (isDark) WarningTitleDark else WarningTitle,
             )
             warnings.forEach { warning ->
                 Text(
                     text = "• $warning",
                     style = MaterialTheme.typography.bodySmall,
-                    color = WarningText,
+                    color = if (isDark) WarningTextDark else WarningText,
                 )
             }
         }

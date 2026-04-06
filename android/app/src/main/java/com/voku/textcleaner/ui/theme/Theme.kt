@@ -22,6 +22,11 @@ internal val WarningBorder = Color(0xFFFDE68A)
 internal val WarningTitle = Color(0xFF92400E)
 internal val WarningText = Color(0xFF78350F)
 
+internal val WarningBackgroundDark = Color(0xFF2D2000)
+internal val WarningBorderDark = Color(0xFF4D3800)
+internal val WarningTitleDark = Color(0xFFFDE68A)
+internal val WarningTextDark = Color(0xFFFCD34D)
+
 private val LightColors = lightColorScheme(
     primary = Indigo600,
     onPrimary = Color.White,
@@ -32,6 +37,8 @@ private val LightColors = lightColorScheme(
     surface = Color.White,
     onBackground = Color(0xFF111827),
     onSurface = Color(0xFF111827),
+    outlineVariant = Color(0xFFE5E7EB),
+    surfaceContainerLowest = Color(0xFFF9FAFB),
 )
 
 private val DarkColors = darkColorScheme(
@@ -44,6 +51,8 @@ private val DarkColors = darkColorScheme(
     surface = Color(0xFF1F2937),
     onBackground = Color(0xFFF9FAFB),
     onSurface = Color(0xFFF9FAFB),
+    outlineVariant = Color(0xFF374151),
+    surfaceContainerLowest = Color(0xFF111827),
 )
 
 @Composable
