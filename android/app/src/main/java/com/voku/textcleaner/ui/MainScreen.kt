@@ -55,14 +55,12 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
-import androidx.compose.material3.TabRowDefaults
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
@@ -301,19 +299,10 @@ fun MainScreen(
                         )
                     }
 
-                    TabRow(
+                    SecondaryTabRow(
                         selectedTabIndex = selectedTab,
                         containerColor = Color.Transparent,
                         contentColor = MaterialTheme.colorScheme.primary,
-                        indicator = { positions ->
-                            TabRowDefaults.SecondaryIndicator(
-                                modifier = Modifier.tabIndicatorOffset(positions[selectedTab]),
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        },
-                        divider = {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        },
                     ) {
                         tabTitles.forEachIndexed { index, title ->
                             Tab(
@@ -1054,7 +1043,7 @@ private fun PresetDropdown(
             label = { Text("Preset") },
             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
             modifier = Modifier
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
                 .fillMaxWidth(),
             colors = inputFieldColors(),
             shape = panelShape,
