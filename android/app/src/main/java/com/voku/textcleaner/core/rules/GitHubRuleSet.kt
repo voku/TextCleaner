@@ -381,8 +381,6 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^\\[uncategorized\\] ~\\d+.*$", RegexOption.IGNORE_CASE),           // LanguageTool uncategorized annotation
         Regex("^Context: \\.\\.\\..*$"),                                             // LanguageTool context line
         Regex("^\\([A-Z][A-Z0-9_]{5,}\\)$"),                                       // LanguageTool/CodeRabbit error code (e.g. (QB_NEW_EN_...) (GITHUB))
-        Regex("^Also applies to: \\d+-\\d+$", RegexOption.IGNORE_CASE),            // CodeRabbit cross-reference annotation
-        Regex("^Based on learnings: .+$", RegexOption.IGNORE_CASE),                // CodeRabbit self-instruction line
         // General code review tool annotation formats (tool-agnostic)
         Regex("^\\d+-\\d+: .+$"),                                                   // line-range annotation title (e.g. "30-30: Prefer fail-fast...")
         Regex("^[^\\s]+\\.[a-zA-Z0-9]+\\s+\\(\\d+\\)$", RegexOption.IGNORE_CASE), // file-with-count header (e.g. "run-tests.mjs (1)") emitted by any code review tool

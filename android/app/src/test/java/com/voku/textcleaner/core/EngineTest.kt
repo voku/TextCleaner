@@ -2974,14 +2974,14 @@ Do not share my personal information
     }
 
     @Test
-    fun `blind spot - removes Also applies to N-N CodeRabbit cross-reference`() {
+    fun `blind spot - preserves Also applies to N-N CodeRabbit cross-reference (useful line-range context)`() {
         val cleaned = loadCleaned()
-        assertFalse(cleaned.lines().any { it.trim().matches(Regex("Also applies to: \\d+-\\d+", RegexOption.IGNORE_CASE)) })
+        assertTrue(cleaned.lines().any { it.trim().matches(Regex("Also applies to: \\d+-\\d+", RegexOption.IGNORE_CASE)) })
     }
 
     @Test
-    fun `blind spot - removes Based on learnings CodeRabbit self-instruction line`() {
+    fun `blind spot - preserves Based on learnings CodeRabbit self-instruction line (actionable guidance)`() {
         val cleaned = loadCleaned()
-        assertFalse(cleaned.lines().any { it.trim().startsWith("Based on learnings:") })
+        assertTrue(cleaned.lines().any { it.trim().startsWith("Based on learnings:") })
     }
 }

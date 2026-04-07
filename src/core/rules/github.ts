@@ -374,8 +374,6 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^\[uncategorized\] ~\d+.*$/i,                           // LanguageTool uncategorized annotation
     /^Context: \.\.\..+$/,                                   // LanguageTool context line
     /^\([A-Z][A-Z0-9_]{5,}\)$/,                             // LanguageTool/CodeRabbit error code (e.g. (QB_NEW_EN_...) (GITHUB))
-    /^Also applies to: \d+-\d+$/i,                          // CodeRabbit cross-reference annotation
-    /^Based on learnings: .+$/i,                             // CodeRabbit self-instruction line
     // General code review tool annotation formats (tool-agnostic)
     /^\d+-\d+: .+$/,                                         // line-range annotation title (e.g. "30-30: Prefer fail-fast...")
     /^[^\s]+\.[a-z0-9]+\s+\(\d+\)$/i,                       // file-with-count header (e.g. "run-tests.mjs (1)") emitted by any code review tool before per-file comments

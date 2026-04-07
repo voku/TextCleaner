@@ -2922,12 +2922,12 @@ describe('Fixture file — full PR page integration', () => {
       expect(lines.some(l => l.trim() === '(GITHUB)')).toBe(false);
     });
 
-    it('removes "Also applies to: N-N" CodeRabbit cross-reference', () => {
-      expect(cleaned).not.toMatch(/^Also applies to: \d+-\d+$/m);
+    it('preserves "Also applies to: N-N" CodeRabbit cross-reference (useful line-range context)', () => {
+      expect(cleaned).toMatch(/^Also applies to: \d+-\d+$/m);
     });
 
-    it('removes "Based on learnings: ..." CodeRabbit self-instruction line', () => {
-      expect(cleaned).not.toMatch(/^Based on learnings:/m);
+    it('preserves "Based on learnings: ..." CodeRabbit self-instruction line (actionable guidance)', () => {
+      expect(cleaned).toMatch(/^Based on learnings:/m);
     });
   });
 
