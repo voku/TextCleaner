@@ -2468,11 +2468,11 @@ describe('GitHub PR — demo file patterns', () => {
     expect(result.cleanedText).toContain('The actual content.');
   });
 
-  it('removes "📒 Files selected for processing" list header and filenames', () => {
+  it('preserves "📒 Files selected for processing" list and its filenames', () => {
     const result = cleanText({
       rawText: [
         'Review intro.',
-        '\uD83D\uDCDC Files selected for processing (3)',
+        '\uD83D\uDCD2 Files selected for processing (3)',
         'src/foo.ts',
         'src/bar.ts',
         'src/baz.ts',
@@ -2481,10 +2481,11 @@ describe('GitHub PR — demo file patterns', () => {
       ].join('\n'),
       sourceTypeHint: 'github_pr',
     }, GitHubRuleSet);
-    expect(result.cleanedText).not.toContain('Files selected for processing');
-    expect(result.cleanedText).not.toContain('src/foo.ts');
-    expect(result.cleanedText).not.toContain('src/bar.ts');
-    // Content after a blank line following the list is preserved
+    // The files-selected header and file list are useful context and are preserved
+    expect(result.cleanedText).toContain('Files selected for processing');
+    expect(result.cleanedText).toContain('src/foo.ts');
+    expect(result.cleanedText).toContain('src/bar.ts');
+    // Content after the list is also preserved
     expect(result.cleanedText).toContain('The actual review comment.');
   });
 

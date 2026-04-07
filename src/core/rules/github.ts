@@ -355,7 +355,6 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^Review profile: \w+$/i,                               // CodeRabbit run config
     /^Plan: (?:Pro|Free|Team|Enterprise)$/i,                // CodeRabbit plan info
     /^Run ID: [a-f0-9-]+$/,                                 // CodeRabbit run ID
-    /^\uD83D\uDCDC Files selected for processing \(\d+\)$/, // 📒 Files selected for processing (N)
     /^\uD83D\uDCE5 Commits$/,                               // 📥 Commits section header
     /^Reviewing files that changed from the base of the PR and between [a-f0-9]+ and [a-f0-9]+\.$/i, // CodeRabbit commit range
     /^.+ #\d+: .+$/,                                        // Cross-PR references in CodeRabbit "Possibly related PRs" section
@@ -453,12 +452,6 @@ export const GitHubRuleSet: CleanupRuleSet = {
       start: /^\u2764\uFE0F Share$/,
       end: /^$/,
       maxLines: 10,
-    },
-    // "📒 Files selected for processing (N)" list: removes the per-file review manifest
-    // No blank line ends the list, so maxLines caps removal after the header + file entries.
-    {
-      start: /^\uD83D\uDCDC Files selected for processing \(\d+\)$/,
-      maxLines: 30,
     },
     // "🤖 Prompt for AI Agents" paragraph: header line plus its instruction text to next blank
     {

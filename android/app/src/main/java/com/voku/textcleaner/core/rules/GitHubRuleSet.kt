@@ -362,7 +362,6 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^Review profile: \\w+$", RegexOption.IGNORE_CASE),                // CodeRabbit run config
         Regex("^Plan: (?:Pro|Free|Team|Enterprise)$", RegexOption.IGNORE_CASE),  // CodeRabbit plan info
         Regex("^Run ID: [a-f0-9-]+$"),                                            // CodeRabbit run ID
-        Regex("^\uD83D\uDCDC Files selected for processing \\(\\d+\\)$"),        // 📒 Files selected for processing (N)
         Regex("^\uD83D\uDCE5 Commits$"),                                          // 📥 Commits section header
         Regex("^Reviewing files that changed from the base of the PR and between [a-f0-9]+ and [a-f0-9]+\\.$", RegexOption.IGNORE_CASE), // CodeRabbit commit range
         Regex("^.+ #\\d+: .+$"),                                                  // Cross-PR references in CodeRabbit "Possibly related PRs" section
@@ -460,12 +459,6 @@ val GitHubRuleSet = CleanupRuleSet(
             start = Regex("^\u2764\uFE0F Share$"),
             end = Regex("^$"),
             maxLines = 10,
-        ),
-        // "📒 Files selected for processing (N)" list: removes the per-file review manifest
-        // No blank line ends the list, so maxLines caps removal after the header + file entries.
-        BlockPattern(
-            start = Regex("^\uD83D\uDCDC Files selected for processing \\(\\d+\\)$"),
-            maxLines = 30,
         ),
         // "🤖 Prompt for AI Agents" paragraph: header line plus its instruction text to next blank
         BlockPattern(
