@@ -107,12 +107,99 @@ object Engine {
     }
 
     /**
+     * Pre-compute a set of line indices that must survive all cleanup steps.
+     *
+     * This is the "protect specific blocks" stage that runs **before** any
+     * removal step.  It identifies:
+     *  1. Fenced code blocks (``` … ```) — always protected.
+     *  2. Blocks matching [ruleSet.preserveBlockPatterns] — rule-defined content
+     *     that gives the downstream LLM valuable context (e.g. diff hunks).
+     *
+     * Port of `computeProtectedLines()` in `src/core/engine.ts`.
+     */
+    fun computeProtectedLines(lines: List<String>, ruleSet: CleanupRuleSet): Set<Int> {
+        val protectedSet = mutableSetOf<Int>()
+
+        // Step 1 — always protect fenced code blocks
+        var inCodeBlock = false
+        for (i in lines.indices) {
+            val trimmed = lines[i].trim()
+            if (trimmed.startsWith("```")) {
+                protectedSet.add(i) // fence line itself is always protected
+                inCodeBlock = !inCodeBlock
+            } else if (inCodeBlock) {
+                protectedSet.add(i)
+            }
+        }
+
+        // Step 2 — rule-defined preserve block patterns
+        val patterns = ruleSet.preserveBlockPatterns
+        if (patterns.isEmpty()) return protectedSet
+
+        var i = 0
+        while (i < lines.size) {
+            if (i in protectedSet) { i++; continue }
+            val trimmed = lines[i].trim()
+            var advanced = false
+
+            for (bp in patterns) {
+                if (bp.start.containsMatchIn(trimmed)) {
+                    val maxLen = bp.maxLines
+                    protectedSet.add(i) // protect start line itself
+
+                    if (bp.end != null) {
+                        var j = i + 1
+                        while (j < lines.size && (j - i) < maxLen) {
+                            protectedSet.add(j)
+                            if (bp.end.containsMatchIn(lines[j].trim())) {
+                                i = j + 1
+                                advanced = true
+                                break
+                            }
+                            j++
+                        }
+                        if (!advanced) {
+                            i = j // end not found — advance past
+                            advanced = true
+                        }
+                    } else {
+                        val maxBlanks = bp.maxConsecutiveBlankLines
+                        var j = i + 1
+                        var consecutiveBlanks = 0
+                        while (j < lines.size && (j - i) < maxLen) {
+                            if (lines[j].trim().isEmpty()) {
+                                consecutiveBlanks++
+                                if (consecutiveBlanks >= maxBlanks) break
+                            } else {
+                                consecutiveBlanks = 0
+                            }
+                            protectedSet.add(j)
+                            j++
+                        }
+                        i = j
+                        advanced = true
+                    }
+                    break
+                }
+            }
+
+            if (!advanced) i++
+        }
+
+        return protectedSet
+    }
+
+    /**
      * Remove structural blocks identified by start/end marker patterns.
      * Enables removing multi-line sections (e.g. CodeRabbit review tables,
      * bot review sections) that individual line matching cannot catch.
+     *
+     * @param protectedLines optional pre-computed set from [computeProtectedLines].
+     *   Lines in this set are immune from block removal.  When null, code fences
+     *   are still protected via inline tracking (backward-compatible fallback).
      * Port of `removeBlocks()` in `src/core/engine.ts`.
      */
-    fun removeBlocks(lines: List<String>, ruleSet: CleanupRuleSet): List<String> {
+    fun removeBlocks(lines: List<String>, ruleSet: CleanupRuleSet, protectedLines: Set<Int>? = null): List<String> {
         val patterns = ruleSet.blockPatterns
         if (patterns.isEmpty()) return lines
 
@@ -121,9 +208,17 @@ object Engine {
         var i = 0
 
         while (i < lines.size) {
+            // Explicit protection: pre-computed protected lines are always kept
+            // and can never trigger a block-removal start pattern.
+            if (protectedLines != null && i in protectedLines) {
+                result.add(lines[i])
+                i++
+                continue
+            }
+
             val trimmed = lines[i].trim()
 
-            // Track code blocks — never remove inside them
+            // Fallback code-block tracking (used when protectedLines is not passed)
             if (trimmed.startsWith("```")) {
                 inCodeBlock = !inCodeBlock
                 result.add(lines[i])
@@ -160,12 +255,22 @@ object Engine {
                         }
                         // If end not found within maxLines, don't remove anything
                     } else {
-                        // No end pattern — block extends to next blank line
+                        // No end pattern — block extends to the first blank line, or to
+                        // maxConsecutiveBlankLines consecutive blank lines when > 1.
                         var j = i + 1
-                        while (j < lines.size && (j - i) < maxLen && lines[j].trim().isNotEmpty()) {
+                        var consecutiveBlanks = 0
+                        while (j < lines.size && (j - i) < maxLen) {
+                            if (lines[j].trim().isEmpty()) {
+                                consecutiveBlanks++
+                                if (consecutiveBlanks >= bp.maxConsecutiveBlankLines) {
+                                    break
+                                }
+                            } else {
+                                consecutiveBlanks = 0
+                            }
                             j++
                         }
-                        i = j // skip block (blank line itself will be kept on next iteration)
+                        i = j // skip block (terminating blank line kept on next iteration)
                         matched = true
                     }
                     break
@@ -181,42 +286,52 @@ object Engine {
         return result
     }
 
+    /**
+     * @param protectedLines optional pre-computed set from [computeProtectedLines].
+     *   Lines in this set are always kept regardless of any removal rule.  When
+     *   null, code fences are still protected via inline tracking (backward-
+     *   compatible fallback).
+     */
     fun cleanMiddle(
         lines: List<String>,
         ruleSet: CleanupRuleSet,
         skipIntensive: Boolean = false,
+        protectedLines: Set<Int>? = null,
     ): List<String> {
         var inCodeBlock = false
 
-        return lines.filter { line ->
+        return lines.filterIndexed { i, line ->
+            // Explicit protection: pre-computed protected lines are immune from all rules.
+            if (protectedLines != null && i in protectedLines) return@filterIndexed true
+
             val trimmed = line.trim()
 
             if (trimmed.startsWith("```")) {
                 inCodeBlock = !inCodeBlock
-                return@filter true
+                return@filterIndexed true
             }
 
             if (inCodeBlock) {
-                return@filter true
+                return@filterIndexed true
             }
 
-            if (trimmed.isEmpty()) return@filter true // Keep blank lines for now, collapse later
+            if (trimmed.isEmpty()) return@filterIndexed true // Keep blank lines for now, collapse later
 
             if (isPreserved(trimmed, ruleSet)) {
-                return@filter true
+                return@filterIndexed true
             }
 
             if (trimmed in ruleSet.removeAnywhereExactLines) {
-                return@filter false
+                return@filterIndexed false
             }
 
             if (!skipIntensive) {
                 if (ruleSet.removeAnywhereContains.any { trimmed.contains(it) }) {
-                    return@filter false
+                    return@filterIndexed false
                 }
 
                 if (ruleSet.removeAnywhereRegexes.any { it.containsMatchIn(trimmed) }) {
-                    return@filter false
+                    return@filterIndexed false
                 }
             }
 
@@ -341,8 +456,12 @@ object Engine {
         } else {
             currentLines = trimPrefix(originalLines, ruleSet)
             currentLines = trimSuffix(currentLines, ruleSet)
-            currentLines = removeBlocks(currentLines, ruleSet)
-            currentLines = cleanMiddle(currentLines, ruleSet, isLargeText)
+            // Pipeline step 3: pre-compute protected lines BEFORE any removal step.
+            // Guarantees valuable context blocks (code fences, diff hunks,
+            // rule-defined preserveBlockPatterns) can never be stripped by cleanup rules.
+            val protectedLines = computeProtectedLines(currentLines, ruleSet)
+            currentLines = removeBlocks(currentLines, ruleSet, protectedLines)
+            currentLines = cleanMiddle(currentLines, ruleSet, isLargeText, protectedLines)
             currentLines = collapseBlankLines(currentLines)
         }
 

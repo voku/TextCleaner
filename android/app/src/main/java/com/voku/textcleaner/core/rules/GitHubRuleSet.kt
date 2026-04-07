@@ -94,7 +94,7 @@ val GitHubRuleSet = CleanupRuleSet(
     ),
     suffixRegexes = listOf(
         Regex("^\u00A9 \\d{4} GitHub, Inc\\.$", RegexOption.IGNORE_CASE),
-        Regex("^@.+$", RegexOption.IGNORE_CASE),
+        Regex("^@(?!@).+$", RegexOption.IGNORE_CASE), // @handle lines — note: not ^@@ so diff headers are NOT matched
         Regex("^\\+?\\d+ more reviewers?$", RegexOption.IGNORE_CASE),
     ),
     removeAnywhereExactLines = listOf(
@@ -126,7 +126,8 @@ val GitHubRuleSet = CleanupRuleSet(
         "\u2022",
         "left a comment",
         "Code Review",
-        "Walkthrough",
+        // NOTE: "Walkthrough" is intentionally NOT removed — the prose paragraph
+        // below it is a concise LLM-generated summary of what the PR does.
         "Changes",
         "Cohort / File(s)\tSummary",
         "Estimated code review effort",
@@ -148,15 +149,25 @@ val GitHubRuleSet = CleanupRuleSet(
         "Read all affected files",
         "Merged",
         "Outdated",
+        // PR header / status chrome (appear after prefix cut-off in copy-mode pastes)
+        "code",     // PR tab label (lowercase copy-mode variant)
+        "merged",   // PR status badge (lowercase)
+        "from",     // connector word from "merged N commits into main from branch"
+        // CodeRabbit section separators and meta-labels
+        "---",                  // horizontal rule separator between review sections
+        // Code review tool section labels (general — any structured review tool uses these)
+        "Inline comments:",     // structural divider within consolidated review output
+        "Nitpick comments:",    // structural divider (minor-suggestions section label)
         // Discovered via static analysis of real PR samples
         "Conversation",
         "Conversations",
         "Codex Task",
-        "Summary by CodeRabbit",
+        // NOTE: "Summary by CodeRabbit" and "Release Notes" are intentionally NOT removed.
+        // The bullet-point summaries (New Features / Improvements / Chores) are concise,
+        // high-quality, LLM-generated context about what changed in the PR.
         "Sequence Diagram(s)",
         "Poem",
         "CodeRabbit",
-        "Release Notes",
         // Discovered via analysis of GitHub Issue, Repo, and Files Changed pages
         "Type '/' to search",
         "Sponsor this project",
@@ -362,11 +373,19 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^Review profile: \\w+$", RegexOption.IGNORE_CASE),                // CodeRabbit run config
         Regex("^Plan: (?:Pro|Free|Team|Enterprise)$", RegexOption.IGNORE_CASE),  // CodeRabbit plan info
         Regex("^Run ID: [a-f0-9-]+$"),                                            // CodeRabbit run ID
-        Regex("^\uD83D\uDCDC Files selected for processing \\(\\d+\\)$"),        // 📒 Files selected for processing (N)
         Regex("^\uD83D\uDCE5 Commits$"),                                          // 📥 Commits section header
         Regex("^Reviewing files that changed from the base of the PR and between [a-f0-9]+ and [a-f0-9]+\\.$", RegexOption.IGNORE_CASE), // CodeRabbit commit range
         Regex("^.+ #\\d+: .+$"),                                                  // Cross-PR references in CodeRabbit "Possibly related PRs" section
         Regex("^[+-]\\d+\\.\\d{3}$"),                                             // European thousands-separator change counts (e.g. -6.106)
+        // Discovered via double-pass blind-spot analysis
+        Regex("^\\d+$"),                                                             // standalone numeric badges (commit count, PR number, etc.)
+        Regex("^\\[grammar\\] ~\\d+.*$", RegexOption.IGNORE_CASE),                 // LanguageTool grammar annotation
+        Regex("^\\[uncategorized\\] ~\\d+.*$", RegexOption.IGNORE_CASE),           // LanguageTool uncategorized annotation
+        Regex("^Context: \\.\\.\\..*$"),                                             // LanguageTool context line
+        Regex("^\\([A-Z][A-Z0-9_]{5,}\\)$"),                                       // LanguageTool/CodeRabbit error code (e.g. (QB_NEW_EN_...) (GITHUB))
+        // General code review tool annotation formats (tool-agnostic)
+        Regex("^\\d+-\\d+: .+$"),                                                   // line-range annotation title (e.g. "30-30: Prefer fail-fast...")
+        Regex("^[^\\s]+\\.[a-zA-Z0-9]+\\s+\\(\\d+\\)$", RegexOption.IGNORE_CASE), // file-with-count header (e.g. "run-tests.mjs (1)") emitted by any code review tool
     ),
     preserveRegexes = listOf(
         Regex("^#+ "),                              // Headings
@@ -374,13 +393,30 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^\\* "),                             // Bullets
         Regex("^> "),                               // Blockquotes
         Regex("^```"),                              // Code blocks
-        Regex("^[a-zA-Z0-9_.-]+\\.[a-zA-Z0-9]+$"), // Filenames
+        Regex("^[a-zA-Z0-9][a-zA-Z0-9_.-]*\\.[a-zA-Z0-9]+$"), // Filenames (must start with letter/digit to avoid matching -6.106)
         Regex("^\\+ "),                             // Diff additions
         Regex("^- "),                               // Diff deletions
         Regex("^@@ .* @@"),                         // Diff headers
     ),
     // Block-aware removal: detect and remove multi-line structural sections
     blockPatterns = listOf(
+        // Merge-direction row: "merged [actor] merged N commit(s) into [base] from [head]"
+        // The exact words are already stripped by removeAnywhereExactLines, but the actor
+        // username and branch names that sit between them survive as orphan lines.
+        // "merged" (the lowercase status badge) is the block start; the FFFC→blank terminates it.
+        // Case-sensitive: "Merged" Title Case appears in test inputs without blank-line separators.
+        BlockPattern(
+            start = Regex("^merged$"),
+            maxLines = 8,
+        ),
+        // PR-author attribution row: "Owner [username] commented [•] [edited by …]"
+        // "Owner" and "commented" are exact-stripped, leaving the bare username as an orphan.
+        // In the PR-header context there is no FFFC/blank between "Owner" and the username,
+        // so the block consumes both; in mid-document threads the FFFC terminates it after one line.
+        BlockPattern(
+            start = Regex("^Owner$", RegexOption.IGNORE_CASE),
+            maxLines = 2,
+        ),
         // CodeRabbit review table: "Cohort / File(s)  Summary" to next blank line
         BlockPattern(
             start = Regex("^Cohort / File\\(s\\)\\s+Summary$", RegexOption.IGNORE_CASE),
@@ -416,16 +452,12 @@ val GitHubRuleSet = CleanupRuleSet(
             end = Regex("^$"),
             maxLines = 30,
         ),
-        // CodeRabbit summary block: "Summary by CodeRabbit" to next blank line
-        BlockPattern(
-            start = Regex("^Summary by CodeRabbit$", RegexOption.IGNORE_CASE),
-            maxLines = 40,
-        ),
-        // CodeRabbit "Walkthrough" section to next blank line
-        BlockPattern(
-            start = Regex("^Walkthrough$", RegexOption.IGNORE_CASE),
-            maxLines = 60,
-        ),
+        // NOTE: "Summary by CodeRabbit" is intentionally NOT blocked/removed.
+        // The "New Features / Improvements / Chores" bullet summaries are high-quality
+        // LLM-generated context about what changed in the PR — exactly what a future
+        // LLM needs to understand the PR without reading the full diff.
+        // NOTE: "Walkthrough" section is intentionally NOT blocked/removed.
+        // The prose paragraph describes the PR's overall structure and intent.
         // CodeRabbit "Poem" section to next blank line
         BlockPattern(
             start = Regex("^Poem$", RegexOption.IGNORE_CASE),
@@ -461,12 +493,6 @@ val GitHubRuleSet = CleanupRuleSet(
             end = Regex("^$"),
             maxLines = 10,
         ),
-        // "📒 Files selected for processing (N)" list: removes the per-file review manifest
-        // No blank line ends the list, so maxLines caps removal after the header + file entries.
-        BlockPattern(
-            start = Regex("^\uD83D\uDCDC Files selected for processing \\(\\d+\\)$"),
-            maxLines = 30,
-        ),
         // "🤖 Prompt for AI Agents" paragraph: header line plus its instruction text to next blank
         BlockPattern(
             start = Regex("^\uD83E\uDD16 Prompt for AI Agents$", RegexOption.IGNORE_CASE),
@@ -478,6 +504,20 @@ val GitHubRuleSet = CleanupRuleSet(
             start = Regex("^\uD83D\uDCE5 Commits$"),
             end = Regex("^$"),
             maxLines = 5,
+        ),
+    ),
+    // Block-aware protection: content blocks that must survive all cleanup rules.
+    // Code fences are always protected by the engine; these patterns protect
+    // additional valuable LLM-context blocks that could otherwise be hit by
+    // future removal rules.
+    preserveBlockPatterns = listOf(
+        // Diff hunks: @@ header + the entire diff body until the next blank line.
+        // preserveRegexes already protects '+'/'-' diff lines individually, but
+        // context lines (starting with a space) are not — this block pattern
+        // guarantees the whole hunk survives as a unit.
+        BlockPattern(
+            start = Regex("^@@ .* @@"),
+            maxLines = 80,
         ),
     ),
 )

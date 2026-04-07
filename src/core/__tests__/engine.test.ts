@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { cleanText, normalizeText, trimPrefix, trimSuffix, cleanMiddle, collapseBlankLines, generateMarkdown, removeBlocks } from '../engine';
+import { cleanText, normalizeText, trimPrefix, trimSuffix, cleanMiddle, collapseBlankLines, generateMarkdown, removeBlocks, computeProtectedLines } from '../engine';
 import { detectSourceType } from '../detector';
 import { GenericRuleSet } from '../rules/generic';
 import { GitHubRuleSet } from '../rules/github';
@@ -280,6 +280,121 @@ Copy link
   });
 });
 
+describe('computeProtectedLines — Pipeline Step 3', () => {
+  it('marks code fence lines and their content as protected', () => {
+    const lines = ['intro', '```js', 'const x = 1;', '```', 'outro'];
+    const set = computeProtectedLines(lines, GenericRuleSet);
+    // indices 1 (open fence), 2 (content), 3 (close fence) must be protected
+    expect(set.has(1)).toBe(true);
+    expect(set.has(2)).toBe(true);
+    expect(set.has(3)).toBe(true);
+    // non-fence lines are NOT protected
+    expect(set.has(0)).toBe(false);
+    expect(set.has(4)).toBe(false);
+  });
+
+  it('protects an unclosed code fence to the end of the input', () => {
+    const lines = ['# Title', '```python', 'import os', 'print("hi")'];
+    const set = computeProtectedLines(lines, GenericRuleSet);
+    expect(set.has(1)).toBe(true); // open fence
+    expect(set.has(2)).toBe(true); // content
+    expect(set.has(3)).toBe(true); // content
+    expect(set.has(0)).toBe(false);
+  });
+
+  it('protects blocks matching preserveBlockPatterns to next blank line', () => {
+    const ruleSet = {
+      ...GenericRuleSet,
+      preserveBlockPatterns: [
+        { start: /^@@ .* @@/, maxLines: 80 },
+      ],
+    };
+    const lines = [
+      'some noise',
+      '@@ -1,3 +1,3 @@',   // index 1 — block start
+      ' context line',       // index 2 — block body (space-prefixed context)
+      '+added line',         // index 3
+      '-removed line',       // index 4
+      '',                    // index 5 — blank terminates block
+      'after content',       // index 6 — NOT protected
+    ];
+    const set = computeProtectedLines(lines, ruleSet);
+    expect(set.has(1)).toBe(true);  // @@ header
+    expect(set.has(2)).toBe(true);  // context line
+    expect(set.has(3)).toBe(true);  // diff addition
+    expect(set.has(4)).toBe(true);  // diff deletion
+    expect(set.has(0)).toBe(false); // noise before block
+    expect(set.has(6)).toBe(false); // content after blank
+  });
+
+  it('protection via preserveBlockPatterns overrides removeAnywhereExactLines in cleanMiddle', () => {
+    // "Advertisement" is in GenericRuleSet.removeAnywhereExactLines.
+    // When it appears inside a protected block it must survive.
+    const ruleSet = {
+      ...GenericRuleSet,
+      preserveBlockPatterns: [
+        { start: /^PROTECT_START$/, maxLines: 10 },
+      ],
+    };
+    const lines = ['PROTECT_START', 'Advertisement', 'real content', '', 'after'];
+    const protected_ = computeProtectedLines(lines, ruleSet);
+    const result = cleanMiddle(lines, ruleSet, false, protected_);
+    // "Advertisement" is inside the protected block so it must survive
+    expect(result).toContain('Advertisement');
+    // Content after the blank (not protected) survives normally
+    expect(result).toContain('after');
+  });
+
+  it('protection via preserveBlockPatterns overrides removeAnywhereExactLines in removeBlocks', () => {
+    // A blockPattern whose start line is inside a protected block must NOT be
+    // removed — the protected set takes precedence over blockPatterns.
+    const ruleSet = {
+      ...GenericRuleSet,
+      blockPatterns: [
+        { start: /^NOISE_BLOCK$/, maxLines: 5 },
+      ],
+      preserveBlockPatterns: [
+        { start: /^PROTECT_START$/, maxLines: 10 },
+      ],
+    };
+    const lines = [
+      'PROTECT_START',   // 0 — protected-block start (also would match nothing here)
+      'NOISE_BLOCK',     // 1 — inside protected block; must NOT trigger block removal
+      'real content',    // 2 — also inside protected block
+      '',                // 3 — blank terminates protected block
+      'after',           // 4
+    ];
+    const protected_ = computeProtectedLines(lines, ruleSet);
+    // indices 0,1,2 are protected (block extends from PROTECT_START to blank)
+    expect(protected_.has(1)).toBe(true);
+    const result = removeBlocks(lines, ruleSet, protected_);
+    // NOISE_BLOCK at index 1 is protected — it must NOT be removed
+    expect(result).toContain('NOISE_BLOCK');
+    expect(result).toContain('real content');
+  });
+
+  it('GitHub diff hunk context lines are protected by preserveBlockPatterns', () => {
+    // Context lines in a diff (leading space) are not in preserveRegexes.
+    // The preserveBlockPattern for @@ hunks must protect them.
+    const rawText = [
+      '# PR',
+      'Description.',
+      '@@ -1,3 +1,4 @@',
+      ' unchanged context line',   // space-prefixed context — normally NOT preserved
+      '+added line',
+      '-removed line',
+      '',
+      'More description.',
+    ].join('\n');
+    const result = cleanText({ rawText, sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).toContain('@@ -1,3 +1,4 @@');
+    expect(result.cleanedText).toContain(' unchanged context line');
+    expect(result.cleanedText).toContain('+added line');
+    expect(result.cleanedText).toContain('-removed line');
+    expect(result.cleanedText).toContain('More description.');
+  });
+});
+
 describe('Full Cleanup Engine', () => {
   it('preserves code blocks entirely', () => {
     const rawText = `
@@ -361,7 +476,8 @@ Privacy
       `
     };
     const result = cleanText(input, GitHubRuleSet);
-    expect(result.cleanedText).toBe('# Fix the bug\nThis PR fixes the bug.\nFiles changed\n1\nCommits\n2\nReview\nrequested changes');
+    // Standalone numbers (1, 2) are removed as numeric badges; review content is kept
+    expect(result.cleanedText).toBe('# Fix the bug\nThis PR fixes the bug.\nFiles changed\nCommits\nReview\nrequested changes');
   });
 
   it('cleans documentation-specific chrome', () => {
@@ -760,7 +876,8 @@ Contact
     expect(result.cleanedText).not.toContain('•');
     expect(result.cleanedText).not.toContain('left a comment');
     expect(result.cleanedText).not.toContain('Code Review');
-    expect(result.cleanedText).not.toContain('Walkthrough');
+    // Walkthrough prose is preserved as useful LLM context
+    expect(result.cleanedText).toContain('Walkthrough');
     expect(result.cleanedText).not.toContain('Changes');
     expect(result.cleanedText).not.toContain('Estimated code review effort');
     expect(result.cleanedText).not.toContain('Possibly related PRs');
@@ -778,8 +895,9 @@ Contact
     // Additional assertions discovered via static analysis of real PR output
     expect(result.cleanedText).not.toContain('Conversation');
     expect(result.cleanedText).not.toContain('Codex Task');
-    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
-    expect(result.cleanedText).not.toContain('Release Notes');
+    // Summary by CodeRabbit and Release Notes are preserved as useful LLM context
+    expect(result.cleanedText).toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).toContain('Release Notes');
     expect(result.cleanedText).not.toContain('Sequence Diagram(s)');
     expect(result.cleanedText).not.toContain('Poem');
     expect(result.cleanedText).not.toContain('🚥 Pre-merge checks');
@@ -788,7 +906,8 @@ Contact
     expect(result.cleanedText).not.toContain('P2 Badge Set gesture delegate only after CPU fallback succeeds');
     expect(result.cleanedText).not.toContain('Comment on lines +146 to 149');
     expect(result.cleanedText).not.toContain('Some comments are outside the diff');
-    expect(result.cleanedText).not.toContain('CodeRabbit');
+    // Standalone "CodeRabbit" bot attribution line is still removed; "Summary by CodeRabbit" is preserved
+    expect(result.cleanedText).not.toMatch(/^CodeRabbit$/m);
     // Standalone @handle lines (nav chrome) must be removed
     expect(result.cleanedText).not.toMatch(/^@coderabbitai$/m);
     expect(result.cleanedText).not.toMatch(/^@github-actions$/m);
@@ -1141,7 +1260,7 @@ Do not share my personal information
     expect(result.cleanedText).not.toContain('•');
     expect(result.cleanedText).not.toContain('left a comment');
     expect(result.cleanedText).not.toContain('Code Review');
-    expect(result.cleanedText).not.toContain('Walkthrough');
+    // Walkthrough and Summary are preserved where present (this PR fixture doesn't have a Walkthrough)
     expect(result.cleanedText).not.toContain('Changes');
     expect(result.cleanedText).not.toContain('Estimated code review effort');
     expect(result.cleanedText).not.toContain('Possibly related PRs');
@@ -1160,13 +1279,13 @@ Do not share my personal information
     // Additional assertions discovered via static analysis of real PR output
     expect(result.cleanedText).not.toContain('Conversation');
     expect(result.cleanedText).not.toContain('Codex Task');
-    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
-    expect(result.cleanedText).not.toContain('Release Notes');
+    // Summary by CodeRabbit and Release Notes are preserved when present; this PR fixture doesn't have them
     expect(result.cleanedText).not.toContain('Sequence Diagram(s)');
     expect(result.cleanedText).not.toContain('🤖 Hi @voku');
     expect(result.cleanedText).not.toContain('P1 Badge Exclude default examples from held-out evaluation');
     expect(result.cleanedText).not.toContain('Comment on lines +470 to +474');
-    expect(result.cleanedText).not.toContain('CodeRabbit');
+    // Standalone 'CodeRabbit' bot attribution line is still removed; 'Summary by CodeRabbit' is preserved
+    expect(result.cleanedText).not.toMatch(/^CodeRabbit$/m);
     // Standalone @handle lines must be removed
     expect(result.cleanedText).not.toMatch(/^@coderabbitai$/m);
     expect(result.cleanedText).not.toMatch(/^@github-actions$/m);
@@ -1193,14 +1312,15 @@ describe('GitHub PR — Static Analysis Pattern Coverage', () => {
     expect(result.cleanedText).toContain('# PR');
   });
 
-  it('removes "Summary by CodeRabbit" section header', () => {
+  it('preserves "Summary by CodeRabbit" section header as useful LLM context', () => {
     const result = cleanText({ rawText: '# PR\nSome content\nSummary by CodeRabbit\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
-    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).toContain('Summary by CodeRabbit');
   });
 
-  it('removes "Release Notes" standalone CodeRabbit section header', () => {
-    const result = cleanText({ rawText: '# PR\nRelease Notes\nNew content', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
-    expect(result.cleanedText).not.toContain('Release Notes');
+  it('preserves "Release Notes" CodeRabbit section header as useful LLM context', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\nSummary by CodeRabbit\nRelease Notes\nNew content', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).toContain('Release Notes');
+    expect(result.cleanedText).toContain('New content');
   });
 
   it('removes "Sequence Diagram(s)" section header', () => {
@@ -1705,25 +1825,43 @@ Privacy`;
     expect(result.cleanedText).toContain('Consider adding a retry mechanism for failed requests.');
   });
 
-  it('removes Summary by CodeRabbit block body up to blank line', () => {
+  it('preserves Summary by CodeRabbit block including multi-paragraph Release Notes (valuable LLM context)', () => {
+    // Summary by CodeRabbit is a high-quality LLM-generated summary of what changed
+    // in the PR. New Features / Improvements / Chores bullet points give a future LLM
+    // exactly the context it needs without requiring it to read the full diff.
     const result = cleanText({
-      rawText: '# PR\nSome content\nSummary by CodeRabbit\nRelease Notes\nNew Features\nGesture recognition improved.\n\nMore real content.',
+      rawText: [
+        '# PR',
+        'Some content',
+        'Summary by CodeRabbit',
+        'Release Notes',
+        'New Features',
+        'Gesture recognition improved.',
+        '',
+        'Improvements',
+        'Performance is better.',
+        '',
+        '',
+        'More real content.',
+      ].join('\n'),
       sourceTypeHint: 'github_pr',
     }, GitHubRuleSet);
-    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
-    expect(result.cleanedText).not.toContain('Release Notes');
-    expect(result.cleanedText).not.toContain('Gesture recognition improved.');
+    expect(result.cleanedText).toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).toContain('Release Notes');
+    expect(result.cleanedText).toContain('Gesture recognition improved.');
+    expect(result.cleanedText).toContain('Improvements');
+    expect(result.cleanedText).toContain('Performance is better.');
     expect(result.cleanedText).toContain('Some content');
     expect(result.cleanedText).toContain('More real content.');
   });
 
-  it('removes Walkthrough section body up to blank line', () => {
+  it('preserves Walkthrough section body as useful LLM context', () => {
     const result = cleanText({
       rawText: '# PR\nSome content\nWalkthrough\nThis PR adds feature X.\nAll tests pass.\n\nMore real content.',
       sourceTypeHint: 'github_pr',
     }, GitHubRuleSet);
-    expect(result.cleanedText).not.toContain('Walkthrough');
-    expect(result.cleanedText).not.toContain('This PR adds feature X.');
+    expect(result.cleanedText).toContain('Walkthrough');
+    expect(result.cleanedText).toContain('This PR adds feature X.');
     expect(result.cleanedText).toContain('Some content');
     expect(result.cleanedText).toContain('More real content.');
   });
@@ -2127,6 +2265,7 @@ Privacy`;
       'Summary by CodeRabbit',
       'Release Notes',
       '',
+      '',              // double blank terminates the multi-paragraph block
       // Inline review comment
       'webapp/src/gesture/core/GestureDetector.ts',
       'Outdated',
@@ -2196,10 +2335,11 @@ Privacy`;
     expect(result.cleanedText).not.toContain('Conversation6 (6)');
     // Bot review block header
     expect(result.cleanedText).not.toContain('review-assist[bot]');
-    // CodeRabbit metadata
+    // CodeRabbit summary and walkthrough are preserved as useful LLM context
+    expect(result.cleanedText).toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).toContain('Release Notes');
+    // Bot metadata noise is still removed
     expect(result.cleanedText).not.toContain('Codex Task');
-    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
-    expect(result.cleanedText).not.toContain('Release Notes');
     // Merge UI noise
     expect(result.cleanedText).not.toContain('Caution');
     expect(result.cleanedText).not.toContain('Review failed');
@@ -2468,11 +2608,11 @@ describe('GitHub PR — demo file patterns', () => {
     expect(result.cleanedText).toContain('The actual content.');
   });
 
-  it('removes "📒 Files selected for processing" list header and filenames', () => {
+  it('preserves "📒 Files selected for processing" list and its filenames', () => {
     const result = cleanText({
       rawText: [
         'Review intro.',
-        '\uD83D\uDCDC Files selected for processing (3)',
+        '\uD83D\uDCD2 Files selected for processing (3)',
         'src/foo.ts',
         'src/bar.ts',
         'src/baz.ts',
@@ -2481,10 +2621,11 @@ describe('GitHub PR — demo file patterns', () => {
       ].join('\n'),
       sourceTypeHint: 'github_pr',
     }, GitHubRuleSet);
-    expect(result.cleanedText).not.toContain('Files selected for processing');
-    expect(result.cleanedText).not.toContain('src/foo.ts');
-    expect(result.cleanedText).not.toContain('src/bar.ts');
-    // Content after a blank line following the list is preserved
+    // The files-selected header and file list are useful context and are preserved
+    expect(result.cleanedText).toContain('Files selected for processing');
+    expect(result.cleanedText).toContain('src/foo.ts');
+    expect(result.cleanedText).toContain('src/bar.ts');
+    // Content after the list is also preserved
     expect(result.cleanedText).toContain('The actual review comment.');
   });
 
@@ -2739,6 +2880,59 @@ describe('Fixture file — full PR page integration', () => {
     it('removes "Add your comment here..." comment-box UI', () => {
       expect(cleaned).not.toContain('Add your comment here...');
       expect(cleaned).not.toContain('Paste, drop, or click to add files');
+    });
+
+    // ── Double-pass blind-spot analysis (2026-04-07) ────────────────────────
+    it('removes European-format diff-stat "-6.106" (was blocked by filename preserveRegex)', () => {
+      expect(cleaned).not.toContain('-6.106');
+    });
+
+    it('removes standalone numeric badge "1" (commit count chrome)', () => {
+      const lines = cleaned.split('\n');
+      expect(lines.some(l => l.trim() === '1')).toBe(false);
+    });
+
+    it('removes standalone "code" (PR tab label from copy-mode paste)', () => {
+      const lines = cleaned.split('\n');
+      expect(lines.some(l => l.trim() === 'code')).toBe(false);
+    });
+
+    it('removes standalone "merged" (lowercase PR status badge)', () => {
+      const lines = cleaned.split('\n');
+      expect(lines.some(l => l.trim() === 'merged')).toBe(false);
+    });
+
+    it('removes standalone "from" (connector from PR header chrome)', () => {
+      const lines = cleaned.split('\n');
+      expect(lines.some(l => l.trim() === 'from')).toBe(false);
+    });
+
+    it('removes "---" horizontal-rule separator (CodeRabbit section divider)', () => {
+      const lines = cleaned.split('\n');
+      expect(lines.some(l => l.trim() === '---')).toBe(false);
+    });
+
+    it('removes LanguageTool [grammar] and [uncategorized] annotations', () => {
+      expect(cleaned).not.toContain('[grammar]');
+      expect(cleaned).not.toContain('[uncategorized]');
+    });
+
+    it('removes LanguageTool "Context: ..." context lines', () => {
+      expect(cleaned).not.toMatch(/^Context: \.\.\./m);
+    });
+
+    it('removes LanguageTool error codes like (QB_NEW_EN_...) and (GITHUB)', () => {
+      expect(cleaned).not.toContain('QB_NEW_EN_ORTHOGRAPHY_ERROR_IDS_1');
+      const lines = cleaned.split('\n');
+      expect(lines.some(l => l.trim() === '(GITHUB)')).toBe(false);
+    });
+
+    it('preserves "Also applies to: N-N" CodeRabbit cross-reference (useful line-range context)', () => {
+      expect(cleaned).toMatch(/^Also applies to: \d+-\d+$/m);
+    });
+
+    it('preserves "Based on learnings: ..." CodeRabbit self-instruction line (actionable guidance)', () => {
+      expect(cleaned).toMatch(/^Based on learnings:/m);
     });
   });
 

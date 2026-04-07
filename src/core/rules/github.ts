@@ -87,7 +87,7 @@ export const GitHubRuleSet: CleanupRuleSet = {
   ],
   suffixRegexes: [
     /^\u00A9 \d{4} GitHub, Inc\.$/i,
-    /^@.+$/i,
+    /^@(?!@).+$/i, // @handle lines — note: ^@ not ^@@ so diff headers (@@ ... @@) are NOT matched
     /^\+?\d+ more reviewers?$/i,
   ],
   removeAnywhereExactLines: [
@@ -119,7 +119,8 @@ export const GitHubRuleSet: CleanupRuleSet = {
     '\u2022',
     'left a comment',
     'Code Review',
-    'Walkthrough',
+    // NOTE: 'Walkthrough' is intentionally NOT removed — the prose paragraph
+    // below it is a concise LLM-generated summary of what the PR does.
     'Changes',
     'Cohort / File(s)\tSummary',
     'Estimated code review effort',
@@ -141,15 +142,25 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Read all affected files',
     'Merged',
     'Outdated',
+    // PR header / status chrome (appear after prefix cut-off in copy-mode pastes)
+    'code',     // PR tab label (lowercase copy-mode variant)
+    'merged',   // PR status badge (lowercase)
+    'from',     // connector word from "merged N commits into main from branch"
+    // CodeRabbit section separators and meta-labels
+    '---',                  // horizontal rule separator between review sections
+    // Code review tool section labels (general — any structured review tool uses these)
+    'Inline comments:',     // structural divider within consolidated review output
+    'Nitpick comments:',    // structural divider (minor-suggestions section label)
     // Discovered via static analysis of real PR samples
     'Conversation',
     'Conversations',
     'Codex Task',
-    'Summary by CodeRabbit',
+    // NOTE: 'Summary by CodeRabbit' and 'Release Notes' are intentionally NOT removed.
+    // The bullet-point summaries (New Features / Improvements / Chores) are concise,
+    // high-quality, LLM-generated context about what changed in the PR.
     'Sequence Diagram(s)',
     'Poem',
     'CodeRabbit',
-    'Release Notes',
     // Discovered via analysis of GitHub Issue, Repo, and Files Changed pages
     'Type \'/\' to search',
     'Sponsor this project',
@@ -355,11 +366,19 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^Review profile: \w+$/i,                               // CodeRabbit run config
     /^Plan: (?:Pro|Free|Team|Enterprise)$/i,                // CodeRabbit plan info
     /^Run ID: [a-f0-9-]+$/,                                 // CodeRabbit run ID
-    /^\uD83D\uDCDC Files selected for processing \(\d+\)$/, // 📒 Files selected for processing (N)
     /^\uD83D\uDCE5 Commits$/,                               // 📥 Commits section header
     /^Reviewing files that changed from the base of the PR and between [a-f0-9]+ and [a-f0-9]+\.$/i, // CodeRabbit commit range
     /^.+ #\d+: .+$/,                                        // Cross-PR references in CodeRabbit "Possibly related PRs" section
     /^[+-]\d+\.\d{3}$/,                                     // European thousands-separator change counts (e.g. -6.106)
+    // Discovered via double-pass blind-spot analysis
+    /^\d+$/,                                                 // standalone numeric badges (commit count, PR number, etc.)
+    /^\[grammar\] ~\d+.*$/i,                                 // LanguageTool grammar annotation
+    /^\[uncategorized\] ~\d+.*$/i,                           // LanguageTool uncategorized annotation
+    /^Context: \.\.\..+$/,                                   // LanguageTool context line
+    /^\([A-Z][A-Z0-9_]{5,}\)$/,                             // LanguageTool/CodeRabbit error code (e.g. (QB_NEW_EN_...) (GITHUB))
+    // General code review tool annotation formats (tool-agnostic)
+    /^\d+-\d+: .+$/,                                         // line-range annotation title (e.g. "30-30: Prefer fail-fast...")
+    /^[^\s]+\.[a-z0-9]+\s+\(\d+\)$/i,                       // file-with-count header (e.g. "run-tests.mjs (1)") emitted by any code review tool before per-file comments
   ],
   preserveRegexes: [
     /^#+ /, // Headings
@@ -367,13 +386,35 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^\* /, // Bullets
     /^> /, // Blockquotes
     /^```/, // Code blocks
-    /^[a-zA-Z0-9_.-]+\.[a-zA-Z0-9]+$/, // Filenames
+    /^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.[a-zA-Z0-9]+$/, // Filenames (must start with letter/digit to avoid matching -6.106)
     /^\+ /, // Diff additions
     /^- /, // Diff deletions
     /^@@ .* @@/, // Diff headers
   ],
   // Block-aware removal: detect and remove multi-line structural sections
   blockPatterns: [
+    // Merge-direction row: "merged [actor] merged N commit(s) into [base] from [head]"
+    // The exact words "merged", "merged N commit(s) into", and "from" are already
+    // stripped by removeAnywhereExactLines, but the actor username and branch names
+    // that sit between them survive as orphan lines.  Treating "merged" (the status
+    // badge word, always lowercase in copy-paste output) as a block start sweeps them
+    // all up in one pass; the FFFC→blank line that always follows terminates the block
+    // before any real PR content.  Case-sensitive to avoid matching "Merged" (Title
+    // Case) which appears in test data without the surrounding blank-line separator.
+    {
+      start: /^merged$/,
+      maxLines: 8,
+    },
+    // PR-author attribution row: "Owner [username] commented [•] [edited by …]"
+    // "Owner" and "commented" are exact-stripped, leaving the bare username as an
+    // orphan.  In the PR-header context there is no FFFC/blank between the "Owner"
+    // label and the username, so the block consumes both; in mid-document comment
+    // threads the FFFC immediately after "Owner" terminates the block after one line
+    // (harmless, since the bot name there is already caught by /^.* bot$/i).
+    {
+      start: /^Owner$/i,
+      maxLines: 2,
+    },
     // CodeRabbit review table: "Cohort / File(s)  Summary" to next blank line
     {
       start: /^Cohort \/ File\(s\)\s+Summary$/i,
@@ -409,16 +450,12 @@ export const GitHubRuleSet: CleanupRuleSet = {
       end: /^$/,
       maxLines: 30,
     },
-    // CodeRabbit summary block: "Summary by CodeRabbit" to next blank line
-    {
-      start: /^Summary by CodeRabbit$/i,
-      maxLines: 40,
-    },
-    // CodeRabbit "Walkthrough" section to next blank line
-    {
-      start: /^Walkthrough$/i,
-      maxLines: 60,
-    },
+    // NOTE: "Summary by CodeRabbit" is intentionally NOT blocked/removed.
+    // The "New Features / Improvements / Chores" bullet summaries are high-quality
+    // LLM-generated context about what changed in the PR — exactly what a future
+    // LLM needs to understand the PR without reading the full diff.
+    // NOTE: "Walkthrough" section is intentionally NOT blocked/removed.
+    // The prose paragraph describes the PR's overall structure and intent.
     // CodeRabbit "Poem" section to next blank line
     {
       start: /^Poem$/i,
@@ -454,12 +491,6 @@ export const GitHubRuleSet: CleanupRuleSet = {
       end: /^$/,
       maxLines: 10,
     },
-    // "📒 Files selected for processing (N)" list: removes the per-file review manifest
-    // No blank line ends the list, so maxLines caps removal after the header + file entries.
-    {
-      start: /^\uD83D\uDCDC Files selected for processing \(\d+\)$/,
-      maxLines: 30,
-    },
     // "🤖 Prompt for AI Agents" paragraph: header line plus its instruction text to next blank
     {
       start: /^\uD83E\uDD16 Prompt for AI Agents$/i,
@@ -471,6 +502,20 @@ export const GitHubRuleSet: CleanupRuleSet = {
       start: /^\uD83D\uDCE5 Commits$/,
       end: /^$/,
       maxLines: 5,
+    },
+  ],
+  // Block-aware protection: content blocks that must survive all cleanup rules.
+  // Code fences are always protected by the engine; these patterns protect
+  // additional valuable LLM-context blocks that could otherwise be hit by
+  // future removal rules.
+  preserveBlockPatterns: [
+    // Diff hunks: @@ header + the entire diff body until the next blank line.
+    // preserveRegexes already protects '+'/'-' diff lines individually, but
+    // context lines (starting with a space) are not — this block pattern
+    // guarantees the whole hunk survives as a unit.
+    {
+      start: /^@@ .* @@/,
+      maxLines: 80,
     },
   ],
 };

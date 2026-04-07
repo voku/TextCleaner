@@ -1,15 +1,5 @@
 add path-aware local ci runner, integration test profiles, and conditional heavy integration job
 
-code
-merged
-voku
-main
-from
-codex/add-local-github-pipeline-tests
-
--6.106
-
-voku
 Motivation
 Speed up developer feedback by making CI checks path-aware and by adding a fast integration profile.
 Avoid expensive installs and long-running integration training steps for unrelated changes.
@@ -25,6 +15,10 @@ Ran the full CI validation via ./scripts/full-check.sh in full mode to verify co
 Executed server training readiness fixture gate with pytest server/test/test_training_pipeline_fixture.py as part of the training-related path gating and it passed.
 Integration test runner changes were exercised by running npm --prefix integration run test:fast and npm --prefix integration run test:full, and both profiles executed as expected.
 
+Summary by CodeRabbit
+Release Notes
+New Features
+
 Added sign language label mapping support for improved model processing.
 Improvements
 
@@ -33,8 +27,6 @@ Streamlined integration testing with flexible test profiles for faster feedback 
 Chores
 
 Enhanced CI workflow with change-aware validation and local testing capabilities.
-
-1
 
 Refresh global model artifacts and remove local sqlite state
 
@@ -84,6 +76,9 @@ server/package.json
 
 Switching the default test:ts script from --runInBand to parallel execution (--maxWorkers=50%) can lead to flaky tests if they share resources like a database, file system, or global state. Given that integration tests are explicitly forced to run serially for stability, it is likely that the server unit/integration tests also require serial execution.
 
+Walkthrough
+This PR introduces modular CI/testing infrastructure with conditional test execution based on path detection. It adds a new ci-feedback.sh script for local CI-like checks with git-aware change filtering, introduces fast and full integration test profiles, refactors integration test setup to separate concerns, updates the CI workflow with a conditional heavy-training job, and adjusts integration test assertions to handle incomplete training jobs gracefully. Model artifacts are also updated.
+
 integration/test/api.test.js
   assert.ok(
     lastKnownStatus === 'queued' || lastKnownStatus === 'running',
@@ -117,9 +112,6 @@ When only integration/** paths are detected, this script installs integration de
 
 Because the main build job now runs the fast integration profile, full training-flow coverage depends on this integration-heavy-training filter. The filter watches training*.ts routes/services but omits other training behavior inputs (for example server/src/constants/trainingQuality.ts, which is consumed by training services), so those changes can skip the heavy profile entirely and lose CI coverage for full training scenarios.
 
-integration/run-tests.mjs (1)
-30-30: Prefer fail-fast on unknown INTEGRATION_TEST_PROFILE.
-
 Silently falling back to full can hide config typos and unexpectedly run heavy suites.
 
 In `@integration/run-tests.mjs` at line 30, The current selection silently falls
@@ -131,7 +123,6 @@ the logic around selectedProfile (the ternary using requestedProfile and
 integrationProfiles) so it throws on unknown values and only sets
 selectedProfile when the profile is valid.
 
-Inline comments:
 In @.github/workflows/ci.yml:
 - Around line 60-72: The filters for the gated jobs miss package/requirements
 files, so update the heavy_integration_related and training_related filter
@@ -203,9 +194,6 @@ updates only the file and operators must set MLP_BASELINE_SHA256 in their
 platform (Docker env, systemd, cloud service) to the file’s value to avoid
 startup validation failures.
 
----
-
-Nitpick comments:
 In `@integration/run-tests.mjs`:
 - Line 30: The current selection silently falls back to 'full' when
 requestedProfile isn't found; change this to fail-fast by checking whether
@@ -287,16 +275,6 @@ By default, dependency installs are skipped when `node_modules` already exists t
 ci-feedback.sh only runs coverage/audit/full-integration steps inside the component blocks selected by changed paths. For actual repo-wide parity, the example here needs --all, or the wording should say "for the selected components."
 
 Based on learnings: Update documentation in the docs/ directory and relevant README.md files to reflect code changes.
-
-[grammar] ~36-~36: Ensure spelling is correct
-Context: ...-feedback.sh --mode full ``` That adds webapp coverage and all npm security audits fr...
-
-(QB_NEW_EN_ORTHOGRAPHY_ERROR_IDS_1)
-
-[uncategorized] ~36-~36: The official name of this software platform is spelled with a capital “H”.
-Context: ...verage and all npm security audits from .github/workflows/ci.yml. By default, depende...
-
-(GITHUB)
 
 In `@docs/workflows/BUILD_AND_TEST.md` around lines 30 - 44, The docs currently
 imply `./scripts/ci-feedback.sh --mode full` triggers repo-wide CI parity, but
