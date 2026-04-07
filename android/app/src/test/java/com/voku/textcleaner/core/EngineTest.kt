@@ -796,7 +796,8 @@ Contact
         assertFalse(result.cleanedText.contains("\u2022"))
         assertFalse(result.cleanedText.contains("left a comment"))
         assertFalse(result.cleanedText.contains("Code Review"))
-        assertFalse(result.cleanedText.contains("Walkthrough"))
+        // Walkthrough prose is preserved as useful LLM context
+        assertTrue(result.cleanedText.contains("Walkthrough"))
         assertFalse(result.cleanedText.contains("Changes"))
         assertFalse(result.cleanedText.contains("Estimated code review effort"))
         assertFalse(result.cleanedText.contains("Possibly related PRs"))
@@ -814,8 +815,9 @@ Contact
         // Additional assertions discovered via static analysis of real PR output
         assertFalse(result.cleanedText.contains("Conversation"))
         assertFalse(result.cleanedText.contains("Codex Task"))
-        assertFalse(result.cleanedText.contains("Summary by CodeRabbit"))
-        assertFalse(result.cleanedText.contains("Release Notes"))
+        // Summary by CodeRabbit and Release Notes are preserved as useful LLM context
+        assertTrue(result.cleanedText.contains("Summary by CodeRabbit"))
+        assertTrue(result.cleanedText.contains("Release Notes"))
         assertFalse(result.cleanedText.contains("Sequence Diagram(s)"))
         assertFalse(result.cleanedText.contains("Poem"))
         assertFalse(result.cleanedText.contains("\uD83D\uDEA5 Pre-merge checks"))
@@ -824,7 +826,8 @@ Contact
         assertFalse(result.cleanedText.contains("P2 Badge Set gesture delegate only after CPU fallback succeeds"))
         assertFalse(result.cleanedText.contains("Comment on lines +146 to 149"))
         assertFalse(result.cleanedText.contains("Some comments are outside the diff"))
-        assertFalse(result.cleanedText.contains("CodeRabbit"))
+        // Standalone "CodeRabbit" bot attribution line is still removed; "Summary by CodeRabbit" is preserved
+        assertFalse(result.cleanedText.lines().any { it == "CodeRabbit" })
         // Standalone @handle lines must be removed
         assertFalse(result.cleanedText.lines().any { it == "@coderabbitai" })
         assertFalse(result.cleanedText.lines().any { it == "@github-actions" })
@@ -1175,7 +1178,7 @@ Do not share my personal information
         assertFalse(result.cleanedText.contains("\u2022"))
         assertFalse(result.cleanedText.contains("left a comment"))
         assertFalse(result.cleanedText.contains("Code Review"))
-        assertFalse(result.cleanedText.contains("Walkthrough"))
+        // Walkthrough and Summary are preserved where present (this PR fixture doesn't have them)
         assertFalse(result.cleanedText.contains("Changes"))
         assertFalse(result.cleanedText.contains("Estimated code review effort"))
         assertFalse(result.cleanedText.contains("Possibly related PRs"))
@@ -1194,12 +1197,12 @@ Do not share my personal information
         // Additional assertions discovered via static analysis of real PR output
         assertFalse(result.cleanedText.contains("Conversation"))
         assertFalse(result.cleanedText.contains("Codex Task"))
-        assertFalse(result.cleanedText.contains("Summary by CodeRabbit"))
-        assertFalse(result.cleanedText.contains("Release Notes"))
+        // Summary by CodeRabbit and Release Notes are preserved when present; this PR fixture doesn't have them
         assertFalse(result.cleanedText.contains("Sequence Diagram(s)"))
         assertFalse(result.cleanedText.contains("\uD83E\uDD16 Hi @voku"))
         assertFalse(result.cleanedText.contains("P1 Badge Exclude default examples from held-out evaluation"))
-        assertFalse(result.cleanedText.contains("CodeRabbit"))
+        // Standalone "CodeRabbit" bot attribution line is still removed
+        assertFalse(result.cleanedText.lines().any { it == "CodeRabbit" })
         assertFalse(result.cleanedText.lines().any { it == "@coderabbitai" })
         assertFalse(result.cleanedText.lines().any { it == "@github-actions" })
         assertFalse(result.cleanedText.lines().any { it == "@review-assist" })
@@ -1224,15 +1227,16 @@ Do not share my personal information
     }
 
     @Test
-    fun `removes Summary by CodeRabbit section header`() {
+    fun `preserves Summary by CodeRabbit section header as useful LLM context`() {
         val result = Engine.cleanText(RawInput(rawText = "# PR\nSome content\nSummary by CodeRabbit\n", sourceTypeHint = SourceType.GITHUB_PR), ruleSetOverride = GitHubRuleSet)
-        assertFalse(result.cleanedText.contains("Summary by CodeRabbit"))
+        assertTrue(result.cleanedText.contains("Summary by CodeRabbit"))
     }
 
     @Test
-    fun `removes Release Notes standalone CodeRabbit section header`() {
-        val result = Engine.cleanText(RawInput(rawText = "# PR\nRelease Notes\nNew content", sourceTypeHint = SourceType.GITHUB_PR), ruleSetOverride = GitHubRuleSet)
-        assertFalse(result.cleanedText.contains("Release Notes"))
+    fun `preserves Release Notes CodeRabbit section header as useful LLM context`() {
+        val result = Engine.cleanText(RawInput(rawText = "# PR\nSome content\nSummary by CodeRabbit\nRelease Notes\nNew content", sourceTypeHint = SourceType.GITHUB_PR), ruleSetOverride = GitHubRuleSet)
+        assertTrue(result.cleanedText.contains("Release Notes"))
+        assertTrue(result.cleanedText.contains("New content"))
     }
 
     @Test
@@ -1880,9 +1884,9 @@ Do not share my personal information
     }
 
     @Test
-    fun `removeBlocks removes Summary by CodeRabbit block including multi-paragraph Release Notes`() {
-        // maxConsecutiveBlankLines=2: block spans past single-blank section separators and
-        // only terminates at a double-blank gap (as seen between GitHub PR sections).
+    fun `preserves Summary by CodeRabbit block including multi-paragraph Release Notes (valuable LLM context)`() {
+        // Summary by CodeRabbit is a high-quality LLM-generated summary of what changed in the PR.
+        // New Features / Improvements / Chores bullet points give a future LLM the context it needs.
         val result = Engine.cleanText(
             RawInput(
                 rawText = listOf(
@@ -1892,28 +1896,28 @@ Do not share my personal information
                     "Release Notes",
                     "New Features",
                     "Gesture recognition improved.",
-                    "",                              // single blank — block continues
+                    "",
                     "Improvements",
                     "Performance is better.",
-                    "",                              // single blank — block continues
-                    "",                              // second blank → two consecutive → block stops
-                    "More real content.",             // after double blank, this is kept
+                    "",
+                    "",
+                    "More real content.",
                 ).joinToString("\n"),
                 sourceTypeHint = SourceType.GITHUB_PR,
             ),
             ruleSetOverride = GitHubRuleSet,
         )
-        assertFalse(result.cleanedText.contains("Summary by CodeRabbit"))
-        assertFalse(result.cleanedText.contains("Release Notes"))
-        assertFalse(result.cleanedText.contains("Gesture recognition improved."))
-        assertFalse(result.cleanedText.contains("Improvements"))
-        assertFalse(result.cleanedText.contains("Performance is better."))
+        assertTrue(result.cleanedText.contains("Summary by CodeRabbit"))
+        assertTrue(result.cleanedText.contains("Release Notes"))
+        assertTrue(result.cleanedText.contains("Gesture recognition improved."))
+        assertTrue(result.cleanedText.contains("Improvements"))
+        assertTrue(result.cleanedText.contains("Performance is better."))
         assertTrue(result.cleanedText.contains("Some content"))
         assertTrue(result.cleanedText.contains("More real content."))
     }
 
     @Test
-    fun `removeBlocks removes Walkthrough section body up to blank line`() {
+    fun `preserves Walkthrough section body as useful LLM context`() {
         val result = Engine.cleanText(
             RawInput(
                 rawText = "# PR\nSome content\nWalkthrough\nThis PR adds feature X.\nAll tests pass.\n\nMore real content.",
@@ -1921,8 +1925,8 @@ Do not share my personal information
             ),
             ruleSetOverride = GitHubRuleSet,
         )
-        assertFalse(result.cleanedText.contains("Walkthrough"))
-        assertFalse(result.cleanedText.contains("This PR adds feature X."))
+        assertTrue(result.cleanedText.contains("Walkthrough"))
+        assertTrue(result.cleanedText.contains("This PR adds feature X."))
         assertTrue(result.cleanedText.contains("Some content"))
         assertTrue(result.cleanedText.contains("More real content."))
     }
@@ -2468,10 +2472,11 @@ Do not share my personal information
         assertFalse(result.cleanedText.contains("Conversation6 (6)"))
         // Bot review block header
         assertFalse(result.cleanedText.contains("review-assist[bot]"))
-        // CodeRabbit metadata
+        // CodeRabbit summary and walkthrough are preserved as useful LLM context
+        assertTrue(result.cleanedText.contains("Summary by CodeRabbit"))
+        assertTrue(result.cleanedText.contains("Release Notes"))
+        // Bot metadata noise is still removed
         assertFalse(result.cleanedText.contains("Codex Task"))
-        assertFalse(result.cleanedText.contains("Summary by CodeRabbit"))
-        assertFalse(result.cleanedText.contains("Release Notes"))
         // Merge UI noise
         assertFalse(result.cleanedText.contains("Caution"))
         assertFalse(result.cleanedText.contains("Review failed"))

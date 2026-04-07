@@ -119,7 +119,8 @@ export const GitHubRuleSet: CleanupRuleSet = {
     '\u2022',
     'left a comment',
     'Code Review',
-    'Walkthrough',
+    // NOTE: 'Walkthrough' is intentionally NOT removed — the prose paragraph
+    // below it is a concise LLM-generated summary of what the PR does.
     'Changes',
     'Cohort / File(s)\tSummary',
     'Estimated code review effort',
@@ -154,11 +155,12 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Conversation',
     'Conversations',
     'Codex Task',
-    'Summary by CodeRabbit',
+    // NOTE: 'Summary by CodeRabbit' and 'Release Notes' are intentionally NOT removed.
+    // The bullet-point summaries (New Features / Improvements / Chores) are concise,
+    // high-quality, LLM-generated context about what changed in the PR.
     'Sequence Diagram(s)',
     'Poem',
     'CodeRabbit',
-    'Release Notes',
     // Discovered via analysis of GitHub Issue, Repo, and Files Changed pages
     'Type \'/\' to search',
     'Sponsor this project',
@@ -448,20 +450,12 @@ export const GitHubRuleSet: CleanupRuleSet = {
       end: /^$/,
       maxLines: 30,
     },
-    // CodeRabbit summary block: "Summary by CodeRabbit" spans multiple paragraphs
-    // (New Features / Improvements / Chores each separated by a single blank line).
-    // maxConsecutiveBlankLines:2 lets the block skip single-blank separators and
-    // only terminates when it hits the double-blank gap after the last section.
-    {
-      start: /^Summary by CodeRabbit$/i,
-      maxLines: 40,
-      maxConsecutiveBlankLines: 2,
-    },
-    // CodeRabbit "Walkthrough" section to next blank line
-    {
-      start: /^Walkthrough$/i,
-      maxLines: 60,
-    },
+    // NOTE: "Summary by CodeRabbit" is intentionally NOT blocked/removed.
+    // The "New Features / Improvements / Chores" bullet summaries are high-quality
+    // LLM-generated context about what changed in the PR — exactly what a future
+    // LLM needs to understand the PR without reading the full diff.
+    // NOTE: "Walkthrough" section is intentionally NOT blocked/removed.
+    // The prose paragraph describes the PR's overall structure and intent.
     // CodeRabbit "Poem" section to next blank line
     {
       start: /^Poem$/i,

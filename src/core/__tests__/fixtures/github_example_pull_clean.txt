@@ -15,6 +15,19 @@ Ran the full CI validation via ./scripts/full-check.sh in full mode to verify co
 Executed server training readiness fixture gate with pytest server/test/test_training_pipeline_fixture.py as part of the training-related path gating and it passed.
 Integration test runner changes were exercised by running npm --prefix integration run test:fast and npm --prefix integration run test:full, and both profiles executed as expected.
 
+Summary by CodeRabbit
+Release Notes
+New Features
+
+Added sign language label mapping support for improved model processing.
+Improvements
+
+Updated model artifacts for enhanced performance.
+Streamlined integration testing with flexible test profiles for faster feedback during development.
+Chores
+
+Enhanced CI workflow with change-aware validation and local testing capabilities.
+
 Refresh global model artifacts and remove local sqlite state
 
 This pull request introduces a new ci-feedback.sh script to provide a faster, path-aware local development loop similar to the CI environment. It also refactors the integration test suite to support 'fast' and 'full' profiles, updates documentation, and adjusts server test execution. Several issues were identified in the new scripts and test logic: the git status parsing in the feedback script is fragile and should use git diff, and the script lacks necessary PIP_FLAGS for certain environments. Additionally, the updated assertion logic in api.test.js weakens the test by allowing it to pass on timeouts, and switching server tests to parallel execution by default may introduce flakiness if resources are shared.
@@ -62,6 +75,9 @@ server/package.json
     "test:ts": "jest --maxWorkers=50% --detectOpenHandles",
 
 Switching the default test:ts script from --runInBand to parallel execution (--maxWorkers=50%) can lead to flaky tests if they share resources like a database, file system, or global state. Given that integration tests are explicitly forced to run serially for stability, it is likely that the server unit/integration tests also require serial execution.
+
+Walkthrough
+This PR introduces modular CI/testing infrastructure with conditional test execution based on path detection. It adds a new ci-feedback.sh script for local CI-like checks with git-aware change filtering, introduces fast and full integration test profiles, refactors integration test setup to separate concerns, updates the CI workflow with a conditional heavy-training job, and adjusts integration test assertions to handle incomplete training jobs gracefully. Model artifacts are also updated.
 
 integration/test/api.test.js
   assert.ok(

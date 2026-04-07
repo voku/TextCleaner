@@ -876,7 +876,8 @@ Contact
     expect(result.cleanedText).not.toContain('•');
     expect(result.cleanedText).not.toContain('left a comment');
     expect(result.cleanedText).not.toContain('Code Review');
-    expect(result.cleanedText).not.toContain('Walkthrough');
+    // Walkthrough prose is preserved as useful LLM context
+    expect(result.cleanedText).toContain('Walkthrough');
     expect(result.cleanedText).not.toContain('Changes');
     expect(result.cleanedText).not.toContain('Estimated code review effort');
     expect(result.cleanedText).not.toContain('Possibly related PRs');
@@ -894,8 +895,9 @@ Contact
     // Additional assertions discovered via static analysis of real PR output
     expect(result.cleanedText).not.toContain('Conversation');
     expect(result.cleanedText).not.toContain('Codex Task');
-    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
-    expect(result.cleanedText).not.toContain('Release Notes');
+    // Summary by CodeRabbit and Release Notes are preserved as useful LLM context
+    expect(result.cleanedText).toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).toContain('Release Notes');
     expect(result.cleanedText).not.toContain('Sequence Diagram(s)');
     expect(result.cleanedText).not.toContain('Poem');
     expect(result.cleanedText).not.toContain('🚥 Pre-merge checks');
@@ -904,7 +906,8 @@ Contact
     expect(result.cleanedText).not.toContain('P2 Badge Set gesture delegate only after CPU fallback succeeds');
     expect(result.cleanedText).not.toContain('Comment on lines +146 to 149');
     expect(result.cleanedText).not.toContain('Some comments are outside the diff');
-    expect(result.cleanedText).not.toContain('CodeRabbit');
+    // Standalone "CodeRabbit" bot attribution line is still removed; "Summary by CodeRabbit" is preserved
+    expect(result.cleanedText).not.toMatch(/^CodeRabbit$/m);
     // Standalone @handle lines (nav chrome) must be removed
     expect(result.cleanedText).not.toMatch(/^@coderabbitai$/m);
     expect(result.cleanedText).not.toMatch(/^@github-actions$/m);
@@ -1257,7 +1260,7 @@ Do not share my personal information
     expect(result.cleanedText).not.toContain('•');
     expect(result.cleanedText).not.toContain('left a comment');
     expect(result.cleanedText).not.toContain('Code Review');
-    expect(result.cleanedText).not.toContain('Walkthrough');
+    // Walkthrough and Summary are preserved where present (this PR fixture doesn't have a Walkthrough)
     expect(result.cleanedText).not.toContain('Changes');
     expect(result.cleanedText).not.toContain('Estimated code review effort');
     expect(result.cleanedText).not.toContain('Possibly related PRs');
@@ -1276,13 +1279,13 @@ Do not share my personal information
     // Additional assertions discovered via static analysis of real PR output
     expect(result.cleanedText).not.toContain('Conversation');
     expect(result.cleanedText).not.toContain('Codex Task');
-    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
-    expect(result.cleanedText).not.toContain('Release Notes');
+    // Summary by CodeRabbit and Release Notes are preserved when present; this PR fixture doesn't have them
     expect(result.cleanedText).not.toContain('Sequence Diagram(s)');
     expect(result.cleanedText).not.toContain('🤖 Hi @voku');
     expect(result.cleanedText).not.toContain('P1 Badge Exclude default examples from held-out evaluation');
     expect(result.cleanedText).not.toContain('Comment on lines +470 to +474');
-    expect(result.cleanedText).not.toContain('CodeRabbit');
+    // Standalone 'CodeRabbit' bot attribution line is still removed; 'Summary by CodeRabbit' is preserved
+    expect(result.cleanedText).not.toMatch(/^CodeRabbit$/m);
     // Standalone @handle lines must be removed
     expect(result.cleanedText).not.toMatch(/^@coderabbitai$/m);
     expect(result.cleanedText).not.toMatch(/^@github-actions$/m);
@@ -1309,14 +1312,15 @@ describe('GitHub PR — Static Analysis Pattern Coverage', () => {
     expect(result.cleanedText).toContain('# PR');
   });
 
-  it('removes "Summary by CodeRabbit" section header', () => {
+  it('preserves "Summary by CodeRabbit" section header as useful LLM context', () => {
     const result = cleanText({ rawText: '# PR\nSome content\nSummary by CodeRabbit\n', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
-    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).toContain('Summary by CodeRabbit');
   });
 
-  it('removes "Release Notes" standalone CodeRabbit section header', () => {
-    const result = cleanText({ rawText: '# PR\nRelease Notes\nNew content', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
-    expect(result.cleanedText).not.toContain('Release Notes');
+  it('preserves "Release Notes" CodeRabbit section header as useful LLM context', () => {
+    const result = cleanText({ rawText: '# PR\nSome content\nSummary by CodeRabbit\nRelease Notes\nNew content', sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).toContain('Release Notes');
+    expect(result.cleanedText).toContain('New content');
   });
 
   it('removes "Sequence Diagram(s)" section header', () => {
@@ -1821,10 +1825,10 @@ Privacy`;
     expect(result.cleanedText).toContain('Consider adding a retry mechanism for failed requests.');
   });
 
-  it('removes Summary by CodeRabbit block including multi-paragraph Release Notes (single blank spans)', () => {
-    // With maxConsecutiveBlankLines:2, the block spans past single-blank section
-    // separators (New Features / Improvements / Chores) and only terminates at
-    // the double-blank gap that follows the last Release Notes section.
+  it('preserves Summary by CodeRabbit block including multi-paragraph Release Notes (valuable LLM context)', () => {
+    // Summary by CodeRabbit is a high-quality LLM-generated summary of what changed
+    // in the PR. New Features / Improvements / Chores bullet points give a future LLM
+    // exactly the context it needs without requiring it to read the full diff.
     const result = cleanText({
       rawText: [
         '# PR',
@@ -1833,31 +1837,31 @@ Privacy`;
         'Release Notes',
         'New Features',
         'Gesture recognition improved.',
-        '',                              // single blank — block continues
+        '',
         'Improvements',
         'Performance is better.',
-        '',                              // single blank — block continues
-        '',                              // second blank → two consecutive blanks → block stops
-        'More real content.',            // after double blank, this is kept
+        '',
+        '',
+        'More real content.',
       ].join('\n'),
       sourceTypeHint: 'github_pr',
     }, GitHubRuleSet);
-    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
-    expect(result.cleanedText).not.toContain('Release Notes');
-    expect(result.cleanedText).not.toContain('Gesture recognition improved.');
-    expect(result.cleanedText).not.toContain('Improvements');
-    expect(result.cleanedText).not.toContain('Performance is better.');
+    expect(result.cleanedText).toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).toContain('Release Notes');
+    expect(result.cleanedText).toContain('Gesture recognition improved.');
+    expect(result.cleanedText).toContain('Improvements');
+    expect(result.cleanedText).toContain('Performance is better.');
     expect(result.cleanedText).toContain('Some content');
     expect(result.cleanedText).toContain('More real content.');
   });
 
-  it('removes Walkthrough section body up to blank line', () => {
+  it('preserves Walkthrough section body as useful LLM context', () => {
     const result = cleanText({
       rawText: '# PR\nSome content\nWalkthrough\nThis PR adds feature X.\nAll tests pass.\n\nMore real content.',
       sourceTypeHint: 'github_pr',
     }, GitHubRuleSet);
-    expect(result.cleanedText).not.toContain('Walkthrough');
-    expect(result.cleanedText).not.toContain('This PR adds feature X.');
+    expect(result.cleanedText).toContain('Walkthrough');
+    expect(result.cleanedText).toContain('This PR adds feature X.');
     expect(result.cleanedText).toContain('Some content');
     expect(result.cleanedText).toContain('More real content.');
   });
@@ -2331,10 +2335,11 @@ Privacy`;
     expect(result.cleanedText).not.toContain('Conversation6 (6)');
     // Bot review block header
     expect(result.cleanedText).not.toContain('review-assist[bot]');
-    // CodeRabbit metadata
+    // CodeRabbit summary and walkthrough are preserved as useful LLM context
+    expect(result.cleanedText).toContain('Summary by CodeRabbit');
+    expect(result.cleanedText).toContain('Release Notes');
+    // Bot metadata noise is still removed
     expect(result.cleanedText).not.toContain('Codex Task');
-    expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
-    expect(result.cleanedText).not.toContain('Release Notes');
     // Merge UI noise
     expect(result.cleanedText).not.toContain('Caution');
     expect(result.cleanedText).not.toContain('Review failed');
