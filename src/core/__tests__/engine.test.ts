@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { cleanText, normalizeText, trimPrefix, trimSuffix, cleanMiddle, collapseBlankLines, generateMarkdown, removeBlocks } from '../engine';
+import { cleanText, normalizeText, trimPrefix, trimSuffix, cleanMiddle, collapseBlankLines, generateMarkdown, removeBlocks, computeProtectedLines } from '../engine';
 import { detectSourceType } from '../detector';
 import { GenericRuleSet } from '../rules/generic';
 import { GitHubRuleSet } from '../rules/github';
@@ -277,6 +277,121 @@ Copy link
     // Outside: stripped
     expect(result).not.toContain('+200');
     expect(result).not.toContain('-95');
+  });
+});
+
+describe('computeProtectedLines — Pipeline Step 3', () => {
+  it('marks code fence lines and their content as protected', () => {
+    const lines = ['intro', '```js', 'const x = 1;', '```', 'outro'];
+    const set = computeProtectedLines(lines, GenericRuleSet);
+    // indices 1 (open fence), 2 (content), 3 (close fence) must be protected
+    expect(set.has(1)).toBe(true);
+    expect(set.has(2)).toBe(true);
+    expect(set.has(3)).toBe(true);
+    // non-fence lines are NOT protected
+    expect(set.has(0)).toBe(false);
+    expect(set.has(4)).toBe(false);
+  });
+
+  it('protects an unclosed code fence to the end of the input', () => {
+    const lines = ['# Title', '```python', 'import os', 'print("hi")'];
+    const set = computeProtectedLines(lines, GenericRuleSet);
+    expect(set.has(1)).toBe(true); // open fence
+    expect(set.has(2)).toBe(true); // content
+    expect(set.has(3)).toBe(true); // content
+    expect(set.has(0)).toBe(false);
+  });
+
+  it('protects blocks matching preserveBlockPatterns to next blank line', () => {
+    const ruleSet = {
+      ...GenericRuleSet,
+      preserveBlockPatterns: [
+        { start: /^@@ .* @@/, maxLines: 80 },
+      ],
+    };
+    const lines = [
+      'some noise',
+      '@@ -1,3 +1,3 @@',   // index 1 — block start
+      ' context line',       // index 2 — block body (space-prefixed context)
+      '+added line',         // index 3
+      '-removed line',       // index 4
+      '',                    // index 5 — blank terminates block
+      'after content',       // index 6 — NOT protected
+    ];
+    const set = computeProtectedLines(lines, ruleSet);
+    expect(set.has(1)).toBe(true);  // @@ header
+    expect(set.has(2)).toBe(true);  // context line
+    expect(set.has(3)).toBe(true);  // diff addition
+    expect(set.has(4)).toBe(true);  // diff deletion
+    expect(set.has(0)).toBe(false); // noise before block
+    expect(set.has(6)).toBe(false); // content after blank
+  });
+
+  it('protection via preserveBlockPatterns overrides removeAnywhereExactLines in cleanMiddle', () => {
+    // "Advertisement" is in GenericRuleSet.removeAnywhereExactLines.
+    // When it appears inside a protected block it must survive.
+    const ruleSet = {
+      ...GenericRuleSet,
+      preserveBlockPatterns: [
+        { start: /^PROTECT_START$/, maxLines: 10 },
+      ],
+    };
+    const lines = ['PROTECT_START', 'Advertisement', 'real content', '', 'after'];
+    const protected_ = computeProtectedLines(lines, ruleSet);
+    const result = cleanMiddle(lines, ruleSet, false, protected_);
+    // "Advertisement" is inside the protected block so it must survive
+    expect(result).toContain('Advertisement');
+    // Content after the blank (not protected) survives normally
+    expect(result).toContain('after');
+  });
+
+  it('protection via preserveBlockPatterns overrides removeAnywhereExactLines in removeBlocks', () => {
+    // A blockPattern whose start line is inside a protected block must NOT be
+    // removed — the protected set takes precedence over blockPatterns.
+    const ruleSet = {
+      ...GenericRuleSet,
+      blockPatterns: [
+        { start: /^NOISE_BLOCK$/, maxLines: 5 },
+      ],
+      preserveBlockPatterns: [
+        { start: /^PROTECT_START$/, maxLines: 10 },
+      ],
+    };
+    const lines = [
+      'PROTECT_START',   // 0 — protected-block start (also would match nothing here)
+      'NOISE_BLOCK',     // 1 — inside protected block; must NOT trigger block removal
+      'real content',    // 2 — also inside protected block
+      '',                // 3 — blank terminates protected block
+      'after',           // 4
+    ];
+    const protected_ = computeProtectedLines(lines, ruleSet);
+    // indices 0,1,2 are protected (block extends from PROTECT_START to blank)
+    expect(protected_.has(1)).toBe(true);
+    const result = removeBlocks(lines, ruleSet, protected_);
+    // NOISE_BLOCK at index 1 is protected — it must NOT be removed
+    expect(result).toContain('NOISE_BLOCK');
+    expect(result).toContain('real content');
+  });
+
+  it('GitHub diff hunk context lines are protected by preserveBlockPatterns', () => {
+    // Context lines in a diff (leading space) are not in preserveRegexes.
+    // The preserveBlockPattern for @@ hunks must protect them.
+    const rawText = [
+      '# PR',
+      'Description.',
+      '@@ -1,3 +1,4 @@',
+      ' unchanged context line',   // space-prefixed context — normally NOT preserved
+      '+added line',
+      '-removed line',
+      '',
+      'More description.',
+    ].join('\n');
+    const result = cleanText({ rawText, sourceTypeHint: 'github_pr' }, GitHubRuleSet);
+    expect(result.cleanedText).toContain('@@ -1,3 +1,4 @@');
+    expect(result.cleanedText).toContain(' unchanged context line');
+    expect(result.cleanedText).toContain('+added line');
+    expect(result.cleanedText).toContain('-removed line');
+    expect(result.cleanedText).toContain('More description.');
   });
 });
 

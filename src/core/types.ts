@@ -48,6 +48,15 @@ export type CleanupRuleSet = {
   preserveRegexes: RegExp[];
   /** Optional structural block patterns for block-aware removal. */
   blockPatterns?: BlockPattern[];
+  /**
+   * Structural block patterns that mark content to *protect* from all cleanup
+   * rules.  The engine pre-computes a set of protected line indices (Step 3 in
+   * the pipeline) before any removal step runs, so these blocks can never be
+   * accidentally stripped by a removal rule added later.
+   *
+   * Code fences (``` … ```) are always protected regardless of this field.
+   */
+  preserveBlockPatterns?: BlockPattern[];
 };
 
 export type CleanedResult = {

@@ -87,7 +87,7 @@ export const GitHubRuleSet: CleanupRuleSet = {
   ],
   suffixRegexes: [
     /^\u00A9 \d{4} GitHub, Inc\.$/i,
-    /^@.+$/i,
+    /^@(?!@).+$/i, // @handle lines — note: ^@ not ^@@ so diff headers (@@ ... @@) are NOT matched
     /^\+?\d+ more reviewers?$/i,
   ],
   removeAnywhereExactLines: [
@@ -488,6 +488,20 @@ export const GitHubRuleSet: CleanupRuleSet = {
       start: /^\uD83D\uDCE5 Commits$/,
       end: /^$/,
       maxLines: 5,
+    },
+  ],
+  // Block-aware protection: content blocks that must survive all cleanup rules.
+  // Code fences are always protected by the engine; these patterns protect
+  // additional valuable LLM-context blocks that could otherwise be hit by
+  // future removal rules.
+  preserveBlockPatterns: [
+    // Diff hunks: @@ header + the entire diff body until the next blank line.
+    // preserveRegexes already protects '+'/'-' diff lines individually, but
+    // context lines (starting with a space) are not — this block pattern
+    // guarantees the whole hunk survives as a unit.
+    {
+      start: /^@@ .* @@/,
+      maxLines: 80,
     },
   ],
 };

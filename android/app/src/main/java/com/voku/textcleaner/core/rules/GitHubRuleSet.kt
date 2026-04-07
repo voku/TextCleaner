@@ -94,7 +94,7 @@ val GitHubRuleSet = CleanupRuleSet(
     ),
     suffixRegexes = listOf(
         Regex("^\u00A9 \\d{4} GitHub, Inc\\.$", RegexOption.IGNORE_CASE),
-        Regex("^@.+$", RegexOption.IGNORE_CASE),
+        Regex("^@(?!@).+$", RegexOption.IGNORE_CASE), // @handle lines — note: not ^@@ so diff headers are NOT matched
         Regex("^\\+?\\d+ more reviewers?$", RegexOption.IGNORE_CASE),
     ),
     removeAnywhereExactLines = listOf(
@@ -495,6 +495,20 @@ val GitHubRuleSet = CleanupRuleSet(
             start = Regex("^\uD83D\uDCE5 Commits$"),
             end = Regex("^$"),
             maxLines = 5,
+        ),
+    ),
+    // Block-aware protection: content blocks that must survive all cleanup rules.
+    // Code fences are always protected by the engine; these patterns protect
+    // additional valuable LLM-context blocks that could otherwise be hit by
+    // future removal rules.
+    preserveBlockPatterns = listOf(
+        // Diff hunks: @@ header + the entire diff body until the next blank line.
+        // preserveRegexes already protects '+'/'-' diff lines individually, but
+        // context lines (starting with a space) are not — this block pattern
+        // guarantees the whole hunk survives as a unit.
+        BlockPattern(
+            start = Regex("^@@ .* @@"),
+            maxLines = 80,
         ),
     ),
 )

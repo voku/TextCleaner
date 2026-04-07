@@ -1770,6 +1770,115 @@ Do not share my personal information
         assertTrue(result.cleanedText.contains("Consider adding a retry mechanism for failed requests."))
     }
 
+    // ── computeProtectedLines — Pipeline Step 3 ─────────────────────────
+
+    @Test
+    fun `computeProtectedLines marks code fence lines and content as protected`() {
+        val lines = listOf("intro", "```js", "const x = 1;", "```", "outro")
+        val set = Engine.computeProtectedLines(lines, GenericRuleSet)
+        assertTrue(set.contains(1)) // open fence
+        assertTrue(set.contains(2)) // content
+        assertTrue(set.contains(3)) // close fence
+        assertFalse(set.contains(0))
+        assertFalse(set.contains(4))
+    }
+
+    @Test
+    fun `computeProtectedLines protects unclosed fence to end of input`() {
+        val lines = listOf("# Title", "```python", "import os", "print(\"hi\")")
+        val set = Engine.computeProtectedLines(lines, GenericRuleSet)
+        assertTrue(set.contains(1))
+        assertTrue(set.contains(2))
+        assertTrue(set.contains(3))
+        assertFalse(set.contains(0))
+    }
+
+    @Test
+    fun `computeProtectedLines protects preserveBlockPattern blocks to next blank line`() {
+        val ruleSet = GenericRuleSet.copy(
+            preserveBlockPatterns = listOf(
+                BlockPattern(start = Regex("^@@ .* @@"), maxLines = 80),
+            ),
+        )
+        val lines = listOf(
+            "some noise",          // 0
+            "@@ -1,3 +1,3 @@",     // 1 — block start
+            " context line",       // 2 — block body
+            "+added line",         // 3
+            "-removed line",       // 4
+            "",                    // 5 — blank terminates block
+            "after content",       // 6 — NOT protected
+        )
+        val set = Engine.computeProtectedLines(lines, ruleSet)
+        assertTrue(set.contains(1))
+        assertTrue(set.contains(2))
+        assertTrue(set.contains(3))
+        assertTrue(set.contains(4))
+        assertFalse(set.contains(0))
+        assertFalse(set.contains(6))
+    }
+
+    @Test
+    fun `computeProtectedLines protection overrides removeAnywhereExactLines in cleanMiddle`() {
+        val ruleSet = GenericRuleSet.copy(
+            preserveBlockPatterns = listOf(
+                BlockPattern(start = Regex("^PROTECT_START$"), maxLines = 10),
+            ),
+        )
+        val lines = listOf("PROTECT_START", "Advertisement", "real content", "", "after")
+        val protectedLines = Engine.computeProtectedLines(lines, ruleSet)
+        val result = Engine.cleanMiddle(lines, ruleSet, protectedLines = protectedLines)
+        assertTrue(result.contains("Advertisement"))
+        assertTrue(result.contains("after"))
+    }
+
+    @Test
+    fun `computeProtectedLines protection prevents blockPattern removal inside protected block`() {
+        val ruleSet = GenericRuleSet.copy(
+            blockPatterns = listOf(
+                BlockPattern(start = Regex("^NOISE_BLOCK$"), maxLines = 5),
+            ),
+            preserveBlockPatterns = listOf(
+                BlockPattern(start = Regex("^PROTECT_START$"), maxLines = 10),
+            ),
+        )
+        val lines = listOf(
+            "PROTECT_START",  // 0
+            "NOISE_BLOCK",    // 1 — inside protected block; must NOT trigger block removal
+            "real content",   // 2
+            "",               // 3 — blank terminates protected block
+            "after",          // 4
+        )
+        val protectedLines = Engine.computeProtectedLines(lines, ruleSet)
+        assertTrue(protectedLines.contains(1))
+        val result = Engine.removeBlocks(lines, ruleSet, protectedLines)
+        assertTrue(result.contains("NOISE_BLOCK"))
+        assertTrue(result.contains("real content"))
+    }
+
+    @Test
+    fun `GitHub diff hunk context lines are protected by preserveBlockPatterns`() {
+        val rawText = listOf(
+            "# PR",
+            "Description.",
+            "@@ -1,3 +1,4 @@",
+            " unchanged context line",
+            "+added line",
+            "-removed line",
+            "",
+            "More description.",
+        ).joinToString("\n")
+        val result = Engine.cleanText(
+            RawInput(rawText = rawText, sourceTypeHint = SourceType.GITHUB_PR),
+            ruleSetOverride = GitHubRuleSet,
+        )
+        assertTrue(result.cleanedText.contains("@@ -1,3 +1,4 @@"))
+        assertTrue(result.cleanedText.contains(" unchanged context line"))
+        assertTrue(result.cleanedText.contains("+added line"))
+        assertTrue(result.cleanedText.contains("-removed line"))
+        assertTrue(result.cleanedText.contains("More description."))
+    }
+
     @Test
     fun `removeBlocks removes Summary by CodeRabbit block including multi-paragraph Release Notes`() {
         // maxConsecutiveBlankLines=2: block spans past single-blank section separators and

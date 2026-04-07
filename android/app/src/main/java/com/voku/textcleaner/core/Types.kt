@@ -64,6 +64,15 @@ data class CleanupRuleSet(
     val preserveRegexes: List<Regex>,
     /** Optional structural block patterns for block-aware removal. */
     val blockPatterns: List<BlockPattern> = emptyList(),
+    /**
+     * Structural block patterns that mark content to *protect* from all cleanup
+     * rules.  The engine pre-computes a set of protected line indices (Step 3 in
+     * the pipeline) before any removal step runs, so these blocks can never be
+     * accidentally stripped by a removal rule added later.
+     *
+     * Code fences (``` … ```) are always protected regardless of this field.
+     */
+    val preserveBlockPatterns: List<BlockPattern> = emptyList(),
 )
 
 /**
