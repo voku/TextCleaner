@@ -141,6 +141,12 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'Read all affected files',
     'Merged',
     'Outdated',
+    // PR header / status chrome (appear after prefix cut-off in copy-mode pastes)
+    'code',     // PR tab label (lowercase copy-mode variant)
+    'merged',   // PR status badge (lowercase)
+    'from',     // connector word from "merged N commits into main from branch"
+    // CodeRabbit section separators and meta-labels
+    '---',                  // horizontal rule separator between review sections
     // Discovered via static analysis of real PR samples
     'Conversation',
     'Conversations',
@@ -359,6 +365,14 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^Reviewing files that changed from the base of the PR and between [a-f0-9]+ and [a-f0-9]+\.$/i, // CodeRabbit commit range
     /^.+ #\d+: .+$/,                                        // Cross-PR references in CodeRabbit "Possibly related PRs" section
     /^[+-]\d+\.\d{3}$/,                                     // European thousands-separator change counts (e.g. -6.106)
+    // Discovered via double-pass blind-spot analysis
+    /^\d+$/,                                                 // standalone numeric badges (commit count, PR number, etc.)
+    /^\[grammar\] ~\d+.*$/i,                                 // LanguageTool grammar annotation
+    /^\[uncategorized\] ~\d+.*$/i,                           // LanguageTool uncategorized annotation
+    /^Context: \.\.\..+$/,                                   // LanguageTool context line
+    /^\([A-Z][A-Z0-9_]{5,}\)$/,                             // LanguageTool/CodeRabbit error code (e.g. (QB_NEW_EN_...) (GITHUB))
+    /^Also applies to: \d+-\d+$/i,                          // CodeRabbit cross-reference annotation
+    /^Based on learnings: .+$/i,                             // CodeRabbit self-instruction line
   ],
   preserveRegexes: [
     /^#+ /, // Headings
@@ -366,7 +380,7 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^\* /, // Bullets
     /^> /, // Blockquotes
     /^```/, // Code blocks
-    /^[a-zA-Z0-9_.-]+\.[a-zA-Z0-9]+$/, // Filenames
+    /^[a-zA-Z0-9][a-zA-Z0-9_.-]*\.[a-zA-Z0-9]+$/, // Filenames (must start with letter/digit to avoid matching -6.106)
     /^\+ /, // Diff additions
     /^- /, // Diff deletions
     /^@@ .* @@/, // Diff headers

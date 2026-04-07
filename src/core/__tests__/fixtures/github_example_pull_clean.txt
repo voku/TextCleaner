@@ -1,13 +1,8 @@
 add path-aware local ci runner, integration test profiles, and conditional heavy integration job
 
-code
-merged
 voku
 main
-from
 codex/add-local-github-pipeline-tests
-
--6.106
 
 voku
 Motivation
@@ -33,8 +28,6 @@ Streamlined integration testing with flexible test profiles for faster feedback 
 Chores
 
 Enhanced CI workflow with change-aware validation and local testing capabilities.
-
-1
 
 Refresh global model artifacts and remove local sqlite state
 
@@ -203,8 +196,6 @@ updates only the file and operators must set MLP_BASELINE_SHA256 in their
 platform (Docker env, systemd, cloud service) to the file’s value to avoid
 startup validation failures.
 
----
-
 Nitpick comments:
 In `@integration/run-tests.mjs`:
 - Line 30: The current selection silently falls back to 'full' when
@@ -253,8 +244,6 @@ These filters miss files that directly change the gated jobs.
 
 integration-heavy-training invokes npm run test:full --prefix integration, but heavy_integration_related does not include integration/package.json or integration/package-lock.json, where that script surface and its dependency graph now live. training_related also omits server/requirements.txt, so a Python training dependency change can bypass the only readiness fixture job.
 
-Also applies to: 113-129
-
 In @.github/workflows/ci.yml around lines 60 - 72, The filters for the gated
 jobs miss package/requirements files, so update the heavy_integration_related
 and training_related filter lists: add integration/package.json and
@@ -285,18 +274,6 @@ By default, dependency installs are skipped when `node_modules` already exists t
 --mode full is still path-scoped, not repo-wide CI parity.
 
 ci-feedback.sh only runs coverage/audit/full-integration steps inside the component blocks selected by changed paths. For actual repo-wide parity, the example here needs --all, or the wording should say "for the selected components."
-
-Based on learnings: Update documentation in the docs/ directory and relevant README.md files to reflect code changes.
-
-[grammar] ~36-~36: Ensure spelling is correct
-Context: ...-feedback.sh --mode full ``` That adds webapp coverage and all npm security audits fr...
-
-(QB_NEW_EN_ORTHOGRAPHY_ERROR_IDS_1)
-
-[uncategorized] ~36-~36: The official name of this software platform is spelled with a capital “H”.
-Context: ...verage and all npm security audits from .github/workflows/ci.yml. By default, depende...
-
-(GITHUB)
 
 In `@docs/workflows/BUILD_AND_TEST.md` around lines 30 - 44, The docs currently
 imply `./scripts/ci-feedback.sh --mode full` triggers repo-wide CI parity, but

@@ -378,7 +378,8 @@ Privacy
         """
         val result = Engine.cleanText(RawInput(rawText = rawText), ruleSetOverride = GitHubRuleSet)
         assertEquals(
-            "# Fix the bug\nThis PR fixes the bug.\nFiles changed\n1\nCommits\n2\nReview\nrequested changes",
+            // Standalone numbers (1, 2) are removed as numeric badges; review content is kept
+            "# Fix the bug\nThis PR fixes the bug.\nFiles changed\nCommits\nReview\nrequested changes",
             result.cleanedText,
         )
     }
@@ -2783,5 +2784,77 @@ Do not share my personal information
     fun `blind spot - preserves CodeRabbit inline-comment analysis text`() {
         val cleaned = loadCleaned()
         assertTrue(cleaned.contains("Silently falling back to full can hide config typos"))
+    }
+
+    // ── Double-pass blind-spot analysis (2026-04-07) ──────────────────────────
+    // Each @Test below pins a noise pattern discovered by running the cleaner
+    // on its own output and checking what additional content could still be removed.
+
+    @Test
+    fun `blind spot - removes European-format diff-stat minus-6-point-106 (was blocked by filename preserveRegex)`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.contains("-6.106"))
+    }
+
+    @Test
+    fun `blind spot - removes standalone numeric badge 1 (commit count chrome)`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.lines().any { it.trim() == "1" })
+    }
+
+    @Test
+    fun `blind spot - removes standalone code (PR tab label from copy-mode paste)`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.lines().any { it.trim() == "code" })
+    }
+
+    @Test
+    fun `blind spot - removes standalone merged (lowercase PR status badge)`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.lines().any { it.trim() == "merged" })
+    }
+
+    @Test
+    fun `blind spot - removes standalone from (connector from PR header chrome)`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.lines().any { it.trim() == "from" })
+    }
+
+    @Test
+    fun `blind spot - removes --- horizontal-rule separator (CodeRabbit section divider)`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.lines().any { it.trim() == "---" })
+    }
+
+    @Test
+    fun `blind spot - removes LanguageTool grammar and uncategorized annotations`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.contains("[grammar]"))
+        assertFalse(cleaned.contains("[uncategorized]"))
+    }
+
+    @Test
+    fun `blind spot - removes LanguageTool Context context lines`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.lines().any { it.trim().startsWith("Context: ...") })
+    }
+
+    @Test
+    fun `blind spot - removes LanguageTool error codes like QB_NEW_EN and GITHUB`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.contains("QB_NEW_EN_ORTHOGRAPHY_ERROR_IDS_1"))
+        assertFalse(cleaned.lines().any { it.trim() == "(GITHUB)" })
+    }
+
+    @Test
+    fun `blind spot - removes Also applies to N-N CodeRabbit cross-reference`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.lines().any { it.trim().matches(Regex("Also applies to: \\d+-\\d+", RegexOption.IGNORE_CASE)) })
+    }
+
+    @Test
+    fun `blind spot - removes Based on learnings CodeRabbit self-instruction line`() {
+        val cleaned = loadCleaned()
+        assertFalse(cleaned.lines().any { it.trim().startsWith("Based on learnings:") })
     }
 }

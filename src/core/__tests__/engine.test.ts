@@ -361,7 +361,8 @@ Privacy
       `
     };
     const result = cleanText(input, GitHubRuleSet);
-    expect(result.cleanedText).toBe('# Fix the bug\nThis PR fixes the bug.\nFiles changed\n1\nCommits\n2\nReview\nrequested changes');
+    // Standalone numbers (1, 2) are removed as numeric badges; review content is kept
+    expect(result.cleanedText).toBe('# Fix the bug\nThis PR fixes the bug.\nFiles changed\nCommits\nReview\nrequested changes');
   });
 
   it('cleans documentation-specific chrome', () => {
@@ -2740,6 +2741,59 @@ describe('Fixture file — full PR page integration', () => {
     it('removes "Add your comment here..." comment-box UI', () => {
       expect(cleaned).not.toContain('Add your comment here...');
       expect(cleaned).not.toContain('Paste, drop, or click to add files');
+    });
+
+    // ── Double-pass blind-spot analysis (2026-04-07) ────────────────────────
+    it('removes European-format diff-stat "-6.106" (was blocked by filename preserveRegex)', () => {
+      expect(cleaned).not.toContain('-6.106');
+    });
+
+    it('removes standalone numeric badge "1" (commit count chrome)', () => {
+      const lines = cleaned.split('\n');
+      expect(lines.some(l => l.trim() === '1')).toBe(false);
+    });
+
+    it('removes standalone "code" (PR tab label from copy-mode paste)', () => {
+      const lines = cleaned.split('\n');
+      expect(lines.some(l => l.trim() === 'code')).toBe(false);
+    });
+
+    it('removes standalone "merged" (lowercase PR status badge)', () => {
+      const lines = cleaned.split('\n');
+      expect(lines.some(l => l.trim() === 'merged')).toBe(false);
+    });
+
+    it('removes standalone "from" (connector from PR header chrome)', () => {
+      const lines = cleaned.split('\n');
+      expect(lines.some(l => l.trim() === 'from')).toBe(false);
+    });
+
+    it('removes "---" horizontal-rule separator (CodeRabbit section divider)', () => {
+      const lines = cleaned.split('\n');
+      expect(lines.some(l => l.trim() === '---')).toBe(false);
+    });
+
+    it('removes LanguageTool [grammar] and [uncategorized] annotations', () => {
+      expect(cleaned).not.toContain('[grammar]');
+      expect(cleaned).not.toContain('[uncategorized]');
+    });
+
+    it('removes LanguageTool "Context: ..." context lines', () => {
+      expect(cleaned).not.toMatch(/^Context: \.\.\./m);
+    });
+
+    it('removes LanguageTool error codes like (QB_NEW_EN_...) and (GITHUB)', () => {
+      expect(cleaned).not.toContain('QB_NEW_EN_ORTHOGRAPHY_ERROR_IDS_1');
+      const lines = cleaned.split('\n');
+      expect(lines.some(l => l.trim() === '(GITHUB)')).toBe(false);
+    });
+
+    it('removes "Also applies to: N-N" CodeRabbit cross-reference', () => {
+      expect(cleaned).not.toMatch(/^Also applies to: \d+-\d+$/m);
+    });
+
+    it('removes "Based on learnings: ..." CodeRabbit self-instruction line', () => {
+      expect(cleaned).not.toMatch(/^Based on learnings:/m);
     });
   });
 

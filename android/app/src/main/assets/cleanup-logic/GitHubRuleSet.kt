@@ -148,6 +148,12 @@ val GitHubRuleSet = CleanupRuleSet(
         "Read all affected files",
         "Merged",
         "Outdated",
+        // PR header / status chrome (appear after prefix cut-off in copy-mode pastes)
+        "code",     // PR tab label (lowercase copy-mode variant)
+        "merged",   // PR status badge (lowercase)
+        "from",     // connector word from "merged N commits into main from branch"
+        // CodeRabbit section separators and meta-labels
+        "---",                  // horizontal rule separator between review sections
         // Discovered via static analysis of real PR samples
         "Conversation",
         "Conversations",
@@ -366,6 +372,14 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^Reviewing files that changed from the base of the PR and between [a-f0-9]+ and [a-f0-9]+\\.$", RegexOption.IGNORE_CASE), // CodeRabbit commit range
         Regex("^.+ #\\d+: .+$"),                                                  // Cross-PR references in CodeRabbit "Possibly related PRs" section
         Regex("^[+-]\\d+\\.\\d{3}$"),                                             // European thousands-separator change counts (e.g. -6.106)
+        // Discovered via double-pass blind-spot analysis
+        Regex("^\\d+$"),                                                             // standalone numeric badges (commit count, PR number, etc.)
+        Regex("^\\[grammar\\] ~\\d+.*$", RegexOption.IGNORE_CASE),                 // LanguageTool grammar annotation
+        Regex("^\\[uncategorized\\] ~\\d+.*$", RegexOption.IGNORE_CASE),           // LanguageTool uncategorized annotation
+        Regex("^Context: \\.\\.\\..*$"),                                             // LanguageTool context line
+        Regex("^\\([A-Z][A-Z0-9_]{5,}\\)$"),                                       // LanguageTool/CodeRabbit error code (e.g. (QB_NEW_EN_...) (GITHUB))
+        Regex("^Also applies to: \\d+-\\d+$", RegexOption.IGNORE_CASE),            // CodeRabbit cross-reference annotation
+        Regex("^Based on learnings: .+$", RegexOption.IGNORE_CASE),                // CodeRabbit self-instruction line
     ),
     preserveRegexes = listOf(
         Regex("^#+ "),                              // Headings
@@ -373,7 +387,7 @@ val GitHubRuleSet = CleanupRuleSet(
         Regex("^\\* "),                             // Bullets
         Regex("^> "),                               // Blockquotes
         Regex("^```"),                              // Code blocks
-        Regex("^[a-zA-Z0-9_.-]+\\.[a-zA-Z0-9]+$"), // Filenames
+        Regex("^[a-zA-Z0-9][a-zA-Z0-9_.-]*\\.[a-zA-Z0-9]+$"), // Filenames (must start with letter/digit to avoid matching -6.106)
         Regex("^\\+ "),                             // Diff additions
         Regex("^- "),                               // Diff deletions
         Regex("^@@ .* @@"),                         // Diff headers
