@@ -23,12 +23,11 @@ It removes obvious site chrome from copied content such as GitHub pull requests,
 
 ## How it works
 
-1. Normalize pasted text.
-2. Detect the source type when auto-detect is enabled.
-3. Apply source-specific cleanup rules.
-4. Remove noisy prefix, suffix, and repeated UI lines.
-5. Preserve headings, bullets, code blocks, filenames, and review content.
-6. Return cleaned text, markdown, and a reusable prompt.
+1. **Normalize** pasted text (line endings, Unicode noise, no-break spaces).
+2. **Detect** the source type when auto-detect is enabled.
+3. **Protect** valuable context blocks before any removal runs — code fences are always protected; rule sets can also declare `preserveBlockPatterns` (e.g. diff hunks) that are immune from all cleanup rules.
+4. **Clean** — remove noisy prefix/suffix chrome, structural bot sections (`blockPatterns`), and repeated UI lines anywhere in the body.
+5. **Format** — collapse blank lines, then return cleaned text, a Markdown excerpt, and a reusable LLM prompt.
 
 ## Supported inputs
 
@@ -77,7 +76,8 @@ The workflow sets `VITE_BASE_PATH=/TextCleaner/` so built assets resolve correct
 ## Key files
 
 - `src/App.tsx` — main UI
-- `src/core/engine.ts` — cleanup pipeline
+- `src/core/engine.ts` — cleanup pipeline (`normalizeText`, `computeProtectedLines`, `removeBlocks`, `cleanMiddle`, `cleanText`)
+- `src/core/types.ts` — shared types (`BlockPattern`, `CleanupRuleSet` with `blockPatterns` / `preserveBlockPatterns`)
 - `src/core/detector.ts` — source detection
 - `src/core/rules/generic.ts` — generic cleanup rules
 - `src/core/rules/github.ts` — GitHub-specific cleanup rules
@@ -116,7 +116,7 @@ Requires JDK 17 and the Android SDK (API 35).
 
 ```bash
 cd android
-./gradlew testCiUnitTest assembleCi
+./gradlew testDebugUnitTest assembleCi
 # APK: app/build/outputs/apk/ci/app-ci.apk
 ```
 
@@ -149,6 +149,7 @@ The release is updated automatically on every push to `main`.
 - Android native app (Kotlin + Jetpack Compose)
 - Kotlin rewrite / port of the full cleanup engine
 - Native share-target flow for Android (`ACTION_SEND` and `PROCESS_TEXT` intent filters)
+- Explicit "protect blocks" pipeline step — `computeProtectedLines` runs before any removal; `preserveBlockPatterns` field lets rule sets declare content that must never be stripped
 
 ## Contributing
 
