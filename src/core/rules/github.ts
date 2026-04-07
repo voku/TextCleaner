@@ -391,6 +391,28 @@ export const GitHubRuleSet: CleanupRuleSet = {
   ],
   // Block-aware removal: detect and remove multi-line structural sections
   blockPatterns: [
+    // Merge-direction row: "merged [actor] merged N commit(s) into [base] from [head]"
+    // The exact words "merged", "merged N commit(s) into", and "from" are already
+    // stripped by removeAnywhereExactLines, but the actor username and branch names
+    // that sit between them survive as orphan lines.  Treating "merged" (the status
+    // badge word, always lowercase in copy-paste output) as a block start sweeps them
+    // all up in one pass; the FFFC→blank line that always follows terminates the block
+    // before any real PR content.  Case-sensitive to avoid matching "Merged" (Title
+    // Case) which appears in test data without the surrounding blank-line separator.
+    {
+      start: /^merged$/,
+      maxLines: 8,
+    },
+    // PR-author attribution row: "Owner [username] commented [•] [edited by …]"
+    // "Owner" and "commented" are exact-stripped, leaving the bare username as an
+    // orphan.  In the PR-header context there is no FFFC/blank between the "Owner"
+    // label and the username, so the block consumes both; in mid-document comment
+    // threads the FFFC immediately after "Owner" terminates the block after one line
+    // (harmless, since the bot name there is already caught by /^.* bot$/i).
+    {
+      start: /^Owner$/i,
+      maxLines: 2,
+    },
     // CodeRabbit review table: "Cohort / File(s)  Summary" to next blank line
     {
       start: /^Cohort \/ File\(s\)\s+Summary$/i,

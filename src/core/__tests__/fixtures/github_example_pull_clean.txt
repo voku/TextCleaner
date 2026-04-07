@@ -1,10 +1,5 @@
 add path-aware local ci runner, integration test profiles, and conditional heavy integration job
 
-voku
-main
-codex/add-local-github-pipeline-tests
-
-voku
 Motivation
 Speed up developer feedback by making CI checks path-aware and by adding a fast integration profile.
 Avoid expensive installs and long-running integration training steps for unrelated changes.

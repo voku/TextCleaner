@@ -398,6 +398,23 @@ val GitHubRuleSet = CleanupRuleSet(
     ),
     // Block-aware removal: detect and remove multi-line structural sections
     blockPatterns = listOf(
+        // Merge-direction row: "merged [actor] merged N commit(s) into [base] from [head]"
+        // The exact words are already stripped by removeAnywhereExactLines, but the actor
+        // username and branch names that sit between them survive as orphan lines.
+        // "merged" (the lowercase status badge) is the block start; the FFFC→blank terminates it.
+        // Case-sensitive: "Merged" Title Case appears in test inputs without blank-line separators.
+        BlockPattern(
+            start = Regex("^merged$"),
+            maxLines = 8,
+        ),
+        // PR-author attribution row: "Owner [username] commented [•] [edited by …]"
+        // "Owner" and "commented" are exact-stripped, leaving the bare username as an orphan.
+        // In the PR-header context there is no FFFC/blank between "Owner" and the username,
+        // so the block consumes both; in mid-document threads the FFFC terminates it after one line.
+        BlockPattern(
+            start = Regex("^Owner$", RegexOption.IGNORE_CASE),
+            maxLines = 2,
+        ),
         // CodeRabbit review table: "Cohort / File(s)  Summary" to next blank line
         BlockPattern(
             start = Regex("^Cohort / File\\(s\\)\\s+Summary$", RegexOption.IGNORE_CASE),
