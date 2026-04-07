@@ -20,15 +20,6 @@ Ran the full CI validation via ./scripts/full-check.sh in full mode to verify co
 Executed server training readiness fixture gate with pytest server/test/test_training_pipeline_fixture.py as part of the training-related path gating and it passed.
 Integration test runner changes were exercised by running npm --prefix integration run test:fast and npm --prefix integration run test:full, and both profiles executed as expected.
 
-Added sign language label mapping support for improved model processing.
-Improvements
-
-Updated model artifacts for enhanced performance.
-Streamlined integration testing with flexible test profiles for faster feedback during development.
-Chores
-
-Enhanced CI workflow with change-aware validation and local testing capabilities.
-
 Refresh global model artifacts and remove local sqlite state
 
 This pull request introduces a new ci-feedback.sh script to provide a faster, path-aware local development loop similar to the CI environment. It also refactors the integration test suite to support 'fast' and 'full' profiles, updates documentation, and adjusts server test execution. Several issues were identified in the new scripts and test logic: the git status parsing in the feedback script is fragile and should use git diff, and the script lacks necessary PIP_FLAGS for certain environments. Additionally, the updated assertion logic in api.test.js weakens the test by allowing it to pass on timeouts, and switching server tests to parallel execution by default may introduce flakiness if resources are shared.
@@ -110,9 +101,6 @@ When only integration/** paths are detected, this script installs integration de
 
 Because the main build job now runs the fast integration profile, full training-flow coverage depends on this integration-heavy-training filter. The filter watches training*.ts routes/services but omits other training behavior inputs (for example server/src/constants/trainingQuality.ts, which is consumed by training services), so those changes can skip the heavy profile entirely and lose CI coverage for full training scenarios.
 
-integration/run-tests.mjs (1)
-30-30: Prefer fail-fast on unknown INTEGRATION_TEST_PROFILE.
-
 Silently falling back to full can hide config typos and unexpectedly run heavy suites.
 
 In `@integration/run-tests.mjs` at line 30, The current selection silently falls
@@ -124,7 +112,6 @@ the logic around selectedProfile (the ternary using requestedProfile and
 integrationProfiles) so it throws on unknown values and only sets
 selectedProfile when the profile is valid.
 
-Inline comments:
 In @.github/workflows/ci.yml:
 - Around line 60-72: The filters for the gated jobs miss package/requirements
 files, so update the heavy_integration_related and training_related filter
@@ -196,7 +183,6 @@ updates only the file and operators must set MLP_BASELINE_SHA256 in their
 platform (Docker env, systemd, cloud service) to the file’s value to avoid
 startup validation failures.
 
-Nitpick comments:
 In `@integration/run-tests.mjs`:
 - Line 30: The current selection silently falls back to 'full' when
 requestedProfile isn't found; change this to fail-fast by checking whether

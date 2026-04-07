@@ -1706,14 +1706,32 @@ Privacy`;
     expect(result.cleanedText).toContain('Consider adding a retry mechanism for failed requests.');
   });
 
-  it('removes Summary by CodeRabbit block body up to blank line', () => {
+  it('removes Summary by CodeRabbit block including multi-paragraph Release Notes (single blank spans)', () => {
+    // With maxConsecutiveBlankLines:2, the block spans past single-blank section
+    // separators (New Features / Improvements / Chores) and only terminates at
+    // the double-blank gap that follows the last Release Notes section.
     const result = cleanText({
-      rawText: '# PR\nSome content\nSummary by CodeRabbit\nRelease Notes\nNew Features\nGesture recognition improved.\n\nMore real content.',
+      rawText: [
+        '# PR',
+        'Some content',
+        'Summary by CodeRabbit',
+        'Release Notes',
+        'New Features',
+        'Gesture recognition improved.',
+        '',                              // single blank — block continues
+        'Improvements',
+        'Performance is better.',
+        '',                              // single blank — block continues
+        '',                              // second blank → two consecutive blanks → block stops
+        'More real content.',            // after double blank, this is kept
+      ].join('\n'),
       sourceTypeHint: 'github_pr',
     }, GitHubRuleSet);
     expect(result.cleanedText).not.toContain('Summary by CodeRabbit');
     expect(result.cleanedText).not.toContain('Release Notes');
     expect(result.cleanedText).not.toContain('Gesture recognition improved.');
+    expect(result.cleanedText).not.toContain('Improvements');
+    expect(result.cleanedText).not.toContain('Performance is better.');
     expect(result.cleanedText).toContain('Some content');
     expect(result.cleanedText).toContain('More real content.');
   });
@@ -2128,6 +2146,7 @@ Privacy`;
       'Summary by CodeRabbit',
       'Release Notes',
       '',
+      '',              // double blank terminates the multi-paragraph block
       // Inline review comment
       'webapp/src/gesture/core/GestureDetector.ts',
       'Outdated',

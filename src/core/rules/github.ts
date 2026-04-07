@@ -147,6 +147,9 @@ export const GitHubRuleSet: CleanupRuleSet = {
     'from',     // connector word from "merged N commits into main from branch"
     // CodeRabbit section separators and meta-labels
     '---',                  // horizontal rule separator between review sections
+    // Code review tool section labels (general — any structured review tool uses these)
+    'Inline comments:',     // structural divider within consolidated review output
+    'Nitpick comments:',    // structural divider (minor-suggestions section label)
     // Discovered via static analysis of real PR samples
     'Conversation',
     'Conversations',
@@ -373,6 +376,9 @@ export const GitHubRuleSet: CleanupRuleSet = {
     /^\([A-Z][A-Z0-9_]{5,}\)$/,                             // LanguageTool/CodeRabbit error code (e.g. (QB_NEW_EN_...) (GITHUB))
     /^Also applies to: \d+-\d+$/i,                          // CodeRabbit cross-reference annotation
     /^Based on learnings: .+$/i,                             // CodeRabbit self-instruction line
+    // General code review tool annotation formats (tool-agnostic)
+    /^\d+-\d+: .+$/,                                         // line-range annotation title (e.g. "30-30: Prefer fail-fast...")
+    /^[^\s]+\.[a-z0-9]+\s+\(\d+\)$/i,                       // file-with-count header (e.g. "run-tests.mjs (1)") emitted by any code review tool before per-file comments
   ],
   preserveRegexes: [
     /^#+ /, // Headings
@@ -422,10 +428,14 @@ export const GitHubRuleSet: CleanupRuleSet = {
       end: /^$/,
       maxLines: 30,
     },
-    // CodeRabbit summary block: "Summary by CodeRabbit" to next blank line
+    // CodeRabbit summary block: "Summary by CodeRabbit" spans multiple paragraphs
+    // (New Features / Improvements / Chores each separated by a single blank line).
+    // maxConsecutiveBlankLines:2 lets the block skip single-blank separators and
+    // only terminates when it hits the double-blank gap after the last section.
     {
       start: /^Summary by CodeRabbit$/i,
       maxLines: 40,
+      maxConsecutiveBlankLines: 2,
     },
     // CodeRabbit "Walkthrough" section to next blank line
     {

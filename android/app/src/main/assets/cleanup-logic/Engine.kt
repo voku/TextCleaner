@@ -160,12 +160,22 @@ object Engine {
                         }
                         // If end not found within maxLines, don't remove anything
                     } else {
-                        // No end pattern — block extends to next blank line
+                        // No end pattern — block extends to the first blank line, or to
+                        // maxConsecutiveBlankLines consecutive blank lines when > 1.
                         var j = i + 1
-                        while (j < lines.size && (j - i) < maxLen && lines[j].trim().isNotEmpty()) {
+                        var consecutiveBlanks = 0
+                        while (j < lines.size && (j - i) < maxLen) {
+                            if (lines[j].trim().isEmpty()) {
+                                consecutiveBlanks++
+                                if (consecutiveBlanks >= bp.maxConsecutiveBlankLines) {
+                                    break
+                                }
+                            } else {
+                                consecutiveBlanks = 0
+                            }
                             j++
                         }
-                        i = j // skip block (blank line itself will be kept on next iteration)
+                        i = j // skip block (terminating blank line kept on next iteration)
                         matched = true
                     }
                     break

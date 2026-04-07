@@ -1771,10 +1771,25 @@ Do not share my personal information
     }
 
     @Test
-    fun `removeBlocks removes Summary by CodeRabbit block body up to blank line`() {
+    fun `removeBlocks removes Summary by CodeRabbit block including multi-paragraph Release Notes`() {
+        // maxConsecutiveBlankLines=2: block spans past single-blank section separators and
+        // only terminates at a double-blank gap (as seen between GitHub PR sections).
         val result = Engine.cleanText(
             RawInput(
-                rawText = "# PR\nSome content\nSummary by CodeRabbit\nRelease Notes\nNew Features\nGesture recognition improved.\n\nMore real content.",
+                rawText = listOf(
+                    "# PR",
+                    "Some content",
+                    "Summary by CodeRabbit",
+                    "Release Notes",
+                    "New Features",
+                    "Gesture recognition improved.",
+                    "",                              // single blank — block continues
+                    "Improvements",
+                    "Performance is better.",
+                    "",                              // single blank — block continues
+                    "",                              // second blank → two consecutive → block stops
+                    "More real content.",             // after double blank, this is kept
+                ).joinToString("\n"),
                 sourceTypeHint = SourceType.GITHUB_PR,
             ),
             ruleSetOverride = GitHubRuleSet,
@@ -1782,6 +1797,8 @@ Do not share my personal information
         assertFalse(result.cleanedText.contains("Summary by CodeRabbit"))
         assertFalse(result.cleanedText.contains("Release Notes"))
         assertFalse(result.cleanedText.contains("Gesture recognition improved."))
+        assertFalse(result.cleanedText.contains("Improvements"))
+        assertFalse(result.cleanedText.contains("Performance is better."))
         assertTrue(result.cleanedText.contains("Some content"))
         assertTrue(result.cleanedText.contains("More real content."))
     }
@@ -2272,6 +2289,7 @@ Do not share my personal information
             "Summary by CodeRabbit",
             "Release Notes",
             "",
+            "",              // double blank terminates the multi-paragraph block
             // Inline review comment
             "webapp/src/gesture/core/GestureDetector.ts",
             "Outdated",
