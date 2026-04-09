@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "TextCleaner",
+  "version": "0.0.0",
+  "description": "Clean noisy copied text from GitHub, docs, articles, and chat before pasting it elsewhere.",
+  "permissions": ["activeTab", "scripting"],
+  "action": {
+    "default_title": "TextCleaner",
+    "default_popup": "popup.html"
+  }
+}

@@ -1,6 +1,6 @@
 # TextCleaner
 
-TextCleaner is a web and Android utility for cleaning noisy copied text before you paste it into an LLM, issue comment, document, or note.
+TextCleaner is a web, Chrome extension, and Android utility for cleaning noisy copied text before you paste it into an LLM, issue comment, document, or note.
 
 It removes obvious site chrome from copied content such as GitHub pull requests, GitHub issues, documentation pages, articles, and chat transcripts while preserving the lines that matter.
 
@@ -19,6 +19,7 @@ It removes obvious site chrome from copied content such as GitHub pull requests,
   - Markdown excerpt
   - Reusable prompt text
 - Local history in the web and Android apps
+- Chrome popup workflow with active-tab text selection import
 - Export helpers for copy and download/save
 
 ## How it works
@@ -73,9 +74,31 @@ The repository includes a GitHub Pages workflow that:
 
 The workflow sets `VITE_BASE_PATH=/TextCleaner/` so built assets resolve correctly under the project page URL.
 
+## Chrome extension (`chome/`)
+
+The repository also includes a Chrome-based browser extension implementation in `chome/`.
+
+### Local extension development
+
+```bash
+npm ci
+npm run dev:chrome
+```
+
+### Build the extension
+
+```bash
+npm run build:chrome
+```
+
+Load `chome/dist` as an unpacked extension in a Chromium-based browser.
+The popup can import the current tab selection, clean it with the shared TypeScript engine, keep a local history, and export the cleaned result.
+
 ## Key files
 
 - `src/App.tsx` — main UI
+- `chome/App.tsx` — Chrome extension popup UI
+- `chome/public/manifest.json` — Chrome extension manifest
 - `src/core/engine.ts` — cleanup pipeline (`normalizeText`, `computeProtectedLines`, `removeBlocks`, `cleanMiddle`, `cleanText`)
 - `src/core/types.ts` — shared types (`BlockPattern`, `CleanupRuleSet` with `blockPatterns` / `preserveBlockPatterns`)
 - `src/core/detector.ts` — source detection
@@ -134,6 +157,7 @@ The release is updated automatically on every push to `main`.
 ## Architecture
 
 - React + TypeScript frontend
+- Chrome extension popup in `chome/` (React + TypeScript, manifest v3)
 - Vite build pipeline
 - Pure rule-based cleanup engine in `src/core/`
 - Static hosting via GitHub Pages
