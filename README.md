@@ -4,6 +4,14 @@ TextCleaner is a web, Chrome extension, and Android utility for cleaning noisy c
 
 It removes obvious site chrome from copied content such as GitHub pull requests, GitHub issues, documentation pages, articles, and chat transcripts while preserving the lines that matter.
 
+## Implementations
+
+| Implementation | Best for | Install |
+|---|---|---|
+| **Web app** (GitHub Pages) | Quick one-off cleaning in a browser tab, no install required | [Open TextCleaner](https://voku.github.io/TextCleaner/) |
+| **Chrome extension** | Cleaning text directly from any tab without leaving your browser | [Releases → Browser Extension – latest build](../../releases/tag/extension-latest) |
+| **Android app** | Cleaning text on mobile via share-target or direct paste | [Releases → Android – latest build](../../releases/tag/android-latest) |
+
 ## Features
 
 - Heuristic cleanup with no backend or hosted AI dependency
@@ -78,6 +86,10 @@ The workflow sets `VITE_BASE_PATH=/TextCleaner/` so built assets resolve correct
 
 The repository also includes a Chrome-based browser extension implementation in `chome/`.
 
+**Download the latest extension:**
+Go to [Releases → Browser Extension – latest build](../../releases/tag/extension-latest) and download `TextCleaner-extension.zip`.
+Unzip it, open `chrome://extensions`, enable *Developer mode*, and click *Load unpacked* to select the folder.
+
 ### Local extension development
 
 ```bash
@@ -124,6 +136,18 @@ Return:
 
 Be concise and focus on implementation-critical files, not boilerplate.
 ```
+
+## Extension CI
+
+The repository includes a `build-extension.yml` workflow that:
+
+1. installs dependencies,
+2. builds the Chrome extension (`chome/dist`),
+3. zips `chome/dist` into `TextCleaner-extension.zip`,
+4. attaches it to the rolling pre-release tag `extension-latest`, and
+5. uploads it as a workflow artifact (retained for 30 days).
+
+The release is updated automatically on every push to `main`.
 
 ## Android
 
@@ -174,6 +198,7 @@ The release is updated automatically on every push to `main`.
 - Kotlin rewrite / port of the full cleanup engine
 - Native share-target flow for Android (`ACTION_SEND` and `PROCESS_TEXT` intent filters)
 - Explicit "protect blocks" pipeline step — `computeProtectedLines` runs before any removal; `preserveBlockPatterns` field lets rule sets declare content that must never be stripped
+- Browser extension CI pipeline with rolling pre-release artifact (`extension-latest`)
 
 ## Contributing
 
