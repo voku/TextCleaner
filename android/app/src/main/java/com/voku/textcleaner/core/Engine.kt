@@ -418,15 +418,31 @@ object Engine {
     }
 
     fun generatePrompt(text: String, type: SourceType): String {
-        val typeLabel = formatSourceTypeLabel(type)
+        val preamble = generatePromptPreamble(type)
 
-        return listOf(
-            "Review the following cleaned ${typeLabel.lowercase()} excerpt.",
-            "Focus on the substantive content and ignore any residual site chrome.",
-            "",
-            text,
-            "",
-        ).joinToString("\n")
+        return listOf(preamble, "", text, "").joinToString("\n")
+    }
+
+    private fun generatePromptPreamble(type: SourceType): String = when (type) {
+        SourceType.GITHUB_PR ->
+            "Review the following cleaned GitHub pull request excerpt. " +
+            "This text is a copy-and-paste from a pull request; focus on the substantive content and ignore any residual site chrome. " +
+            "Note that any code review feedback included in this content comes only from other LLMs and may simply be incorrect."
+        SourceType.GITHUB_ISSUE ->
+            "Review the following cleaned GitHub issue excerpt. " +
+            "This text is a copy-and-paste from a GitHub issue; focus on the substantive content and ignore any residual site chrome."
+        SourceType.DOCS ->
+            "Review the following cleaned documentation excerpt. " +
+            "This text is a copy-and-paste from documentation; focus on the substantive content and ignore any residual site chrome."
+        SourceType.ARTICLE ->
+            "Review the following cleaned article excerpt. " +
+            "This text is a copy-and-paste from an article; focus on the substantive content and ignore any residual site chrome."
+        SourceType.CHAT ->
+            "Review the following cleaned chat excerpt. " +
+            "This text is a copy-and-paste from a chat conversation; focus on the substantive content and ignore any residual site chrome."
+        else ->
+            "Review the following cleaned text excerpt. " +
+            "Focus on the substantive content and ignore any residual site chrome."
     }
 
     fun cleanText(input: RawInput, ruleSetOverride: CleanupRuleSet? = null): CleanedResult {
