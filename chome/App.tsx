@@ -150,7 +150,8 @@ function readHistory(): HistoryItem[] {
   }
 
   try {
-    return JSON.parse(saved) as HistoryItem[];
+    const parsed: unknown = JSON.parse(saved);
+    return Array.isArray(parsed) ? (parsed as HistoryItem[]) : [];
   } catch (error) {
     console.error('Failed to load extension history', error);
     return [];
@@ -242,7 +243,7 @@ export default function PopupApp() {
 
     const nextHistory = [
       {
-        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        id: crypto.randomUUID(),
         timestamp: Date.now(),
         rawText: text,
         preset,
