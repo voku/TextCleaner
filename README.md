@@ -1,6 +1,6 @@
 # TextCleaner
 
-TextCleaner is a web, Chrome-extension, and Android utility for cleaning noisy copied text before you paste it into an LLM, issue comment, document, or note.
+TextCleaner is a web, Chrome extension, and Android utility for cleaning noisy copied text before you paste it into an LLM, issue comment, document, or note.
 
 It removes obvious site chrome from copied content such as GitHub pull requests, GitHub issues, documentation pages, articles, and chat transcripts while preserving the lines that matter.
 
@@ -82,16 +82,16 @@ The repository also includes a Chrome-based browser extension implementation in 
 
 ```bash
 npm ci
-npm run dev:chome
+npm run dev:chrome
 ```
 
 ### Build the extension
 
 ```bash
-npm run build:chome
+npm run build:chrome
 ```
 
-Load `/home/runner/work/TextCleaner/TextCleaner/chome/dist` as an unpacked extension in a Chromium-based browser.
+Load `chome/dist` as an unpacked extension in a Chromium-based browser.
 The popup can import the current tab selection, clean it with the shared TypeScript engine, keep a local history, and export the cleaned result.
 
 ## Key files

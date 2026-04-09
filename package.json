@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "dev:chome": "vite --config chome/vite.config.ts --port=3001 --host=0.0.0.0",
+    "dev:chrome": "vite --config chome/vite.config.ts --port=3001 --host=0.0.0.0",
     "build": "vite build",
-    "build:chome": "vite build --config chome/vite.config.ts",
+    "build:chrome": "vite build --config chome/vite.config.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",

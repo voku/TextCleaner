@@ -15,7 +15,7 @@ type HistoryItem = {
   result: CleanedResult;
 };
 
-const HISTORY_KEY = 'text-cleaner-chome-history';
+const HISTORY_KEY = 'text-cleaner-chrome-history';
 const MAX_HISTORY_ITEMS = 25;
 
 const presetOptions: Array<{value: SourceType | 'auto'; label: string}> = [
