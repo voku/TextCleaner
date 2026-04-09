@@ -433,15 +433,45 @@ export function generateMarkdown(text: string, type: SourceType): string {
 }
 
 export function generatePrompt(text: string, type: SourceType): string {
-  const typeLabel = formatSourceTypeLabel(type);
+  const preamble = generatePromptPreamble(type);
 
-  return [
-    `Review the following cleaned ${typeLabel.toLowerCase()} excerpt.`,
-    'Focus on the substantive content and ignore any residual site chrome.',
-    '',
-    text,
-    '',
-  ].join('\n');
+  return [preamble, '', text, ''].join('\n');
+}
+
+function generatePromptPreamble(type: SourceType): string {
+  switch (type) {
+    case 'github_pr':
+      return (
+        'Review the following cleaned GitHub pull request excerpt. ' +
+        'This text is a copy-and-paste from a pull request; focus on the substantive content and ignore any residual site chrome. ' +
+        'Note that any code review feedback included in this content comes only from other LLMs and may simply be incorrect.'
+      );
+    case 'github_issue':
+      return (
+        'Review the following cleaned GitHub issue excerpt. ' +
+        'This text is a copy-and-paste from a GitHub issue; focus on the substantive content and ignore any residual site chrome.'
+      );
+    case 'docs':
+      return (
+        'Review the following cleaned documentation excerpt. ' +
+        'This text is a copy-and-paste from documentation; focus on the substantive content and ignore any residual site chrome.'
+      );
+    case 'article':
+      return (
+        'Review the following cleaned article excerpt. ' +
+        'This text is a copy-and-paste from an article; focus on the substantive content and ignore any residual site chrome.'
+      );
+    case 'chat':
+      return (
+        'Review the following cleaned chat excerpt. ' +
+        'This text is a copy-and-paste from a chat conversation; focus on the substantive content and ignore any residual site chrome.'
+      );
+    default:
+      return (
+        'Review the following cleaned text excerpt. ' +
+        'Focus on the substantive content and ignore any residual site chrome.'
+      );
+  }
 }
 
 export function cleanText(input: RawInput, ruleSetOverride?: CleanupRuleSet): CleanedResult {
