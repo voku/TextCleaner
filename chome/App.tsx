@@ -185,7 +185,9 @@ async function readCurrentSelection() {
         (activeElement instanceof HTMLInputElement &&
           /^(?:email|search|tel|text|url)$/i.test(activeElement.type))
       ) {
-        const {selectionStart = 0, selectionEnd = 0, value} = activeElement;
+        const selectionStart = activeElement.selectionStart ?? 0;
+        const selectionEnd = activeElement.selectionEnd ?? 0;
+        const {value} = activeElement;
         const selectedValue = value.slice(selectionStart, selectionEnd).trim();
         if (selectedValue) {
           return selectedValue;
@@ -512,7 +514,9 @@ export default function PopupApp() {
                     key={item.id}
                     className="rounded-lg border border-slate-800 bg-slate-950/60 p-2.5"
                   >
-                    <button
+                    <div
+                      role="button"
+                      tabIndex={0}
                       onClick={() => {
                         setRawText(item.rawText);
                         setPreset(item.preset);
@@ -520,7 +524,17 @@ export default function PopupApp() {
                         setActiveTab('cleaned');
                         setNotice('Restored a recent cleanup.');
                       }}
-                      className="w-full text-left"
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          setRawText(item.rawText);
+                          setPreset(item.preset);
+                          setResult(item.result);
+                          setActiveTab('cleaned');
+                          setNotice('Restored a recent cleanup.');
+                        }
+                      }}
+                      className="w-full cursor-pointer text-left"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -545,7 +559,7 @@ export default function PopupApp() {
                       <p className="mt-2 line-clamp-3 text-[11px] leading-4 text-slate-300">
                         {item.rawText}
                       </p>
-                    </button>
+                    </div>
                   </div>
                 ))
               ) : (
