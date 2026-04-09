@@ -1,0 +1,57 @@
+name: Build Browser Extension
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build extension
+        run: npm run build:chrome
+
+      - name: Package extension
+        run: |
+          cd chome/dist
+          zip -r ../../TextCleaner-extension.zip .
+
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: TextCleaner-extension
+          path: TextCleaner-extension.zip
+          retention-days: 30
+
+      - name: Publish rolling latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: extension-latest
+          name: Browser Extension – latest build
+          prerelease: true
+          body: |
+            Automatically built from the latest commit on `main`.
+
+            **Install:**
+            1. Download and unzip `TextCleaner-extension.zip`.
+            2. Open `chrome://extensions` in a Chromium-based browser.
+            3. Enable *Developer mode* and click *Load unpacked*.
+            4. Select the unzipped folder.
+          files: TextCleaner-extension.zip
