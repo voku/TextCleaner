@@ -20,8 +20,9 @@ export function detectSourceType(rawText: string, cleanedText?: string): SourceT
   }
 
   // GitHub Issue
+  const hasIssueKeyword = /\bissues?\b/.test(lowerRaw);
   const isGitHubIssue = 
-    lowerRaw.includes('issue') &&
+    hasIssueKeyword &&
     (lowerRaw.includes('labels') || lowerRaw.includes('assignees') || lowerRaw.includes('milestone') || lowerRaw.includes('open issue'));
     
   if (isGitHubIssue) {

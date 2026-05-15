@@ -106,6 +106,45 @@ I will post the link in the channel.`);
 
     expect(detected).toBe('chat');
   });
+
+  it('does not treat "issue" inside another word as a GitHub issue signal', () => {
+    const detected = detectSourceType(`# Tissue Study
+
+This article analyzes tissue samples across multiple experiments and interviews.
+
+Labels help categorize each sample for the article review.
+Assignees reviewed the draft before publication.`);
+
+    expect(detected).toBe('article');
+  });
+
+  it('still detects GitHub issues when the keyword appears as a real word', () => {
+    const detected = detectSourceType(`Open issue
+
+Labels
+Assignees
+Milestone
+
+The bug is ready for triage.`);
+
+    expect(detected).toBe('github_issue');
+  });
+});
+
+describe('Auto Detection Cleanup', () => {
+  it('keeps article content out of GitHub issue mode when unrelated words contain "issue"', () => {
+    const result = cleanText({
+      rawText: `# Tissue Study
+
+This article analyzes tissue samples across multiple experiments and interviews.
+
+Labels help categorize each sample for the article review.
+Assignees reviewed the draft before publication.`,
+    });
+
+    expect(result.detectedType).toBe('article');
+    expect(result.cleanedText).toContain('tissue samples');
+  });
 });
 
 describe('Markdown Output', () => {
