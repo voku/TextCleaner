@@ -1,6 +1,6 @@
 # TextCleaner
 
-TextCleaner is a web, Chrome extension, and Android utility for cleaning noisy copied text before you paste it into an LLM, issue comment, document, or note.
+TextCleaner is a web, Chrome extension, and Android app for cleaning noisy copied text before you paste it into an LLM.
 
 It removes obvious site chrome from copied content such as GitHub pull requests, GitHub issues, documentation pages, articles, and chat transcripts while preserving the lines that matter.
 
