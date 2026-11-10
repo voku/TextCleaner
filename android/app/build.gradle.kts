@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.voku.textcleaner"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.voku.textcleaner"
